@@ -34,13 +34,23 @@ npx expo start     # servidor de desenvolvimento
 
 Pelo site do Expo (projeto ligado a este repositório): **Builds → Build from GitHub**, plataforma Android, perfil **preview**. O APK fica disponível para baixar e instalar no celular.
 
+## Atualizações pelo ar
+
+O app usa EAS Update (canal `preview`). A cada envio para a `main`, o workflow
+`.eas/workflows/atualizacao-pelo-ar.yml` publica o código novo, e os APKs
+instalados baixam a atualização ao abrir o app.
+
+Só vale para mudanças de código JavaScript. Ao adicionar ou atualizar uma
+biblioteca nativa, a impressão digital (`runtimeVersion: fingerprint`) muda e é
+preciso gerar um APK novo.
+
 ## Status
 
 - [x] Banco, login e regras de acesso
 - [x] Registro de peso, medidas e água
 - [x] Cálculos: metabolismo basal, gasto, déficit, média móvel, projeção, recalibração
-- [ ] Leitura do Health Connect (relógio e Hevy)
-- [ ] Dieta do FatSecret (depende do teste do Health Connect)
+- [x] Leitura do Health Connect: passos, calorias, FC de repouso, sono, treinos, nutrição e peso (últimos 28 dias)
+- [ ] Dieta do FatSecret: entra pelo Health Connect se o FatSecret gravar nutrição lá (a confirmar no celular)
 - [x] Gráficos de progresso: peso com média, meta e projeção; déficit diário; resumo da semana; previsto × real
 - [x] Fotos de progresso: câmera ou galeria, pasta privada, comparativo antes × agora e linha do tempo
 - [x] Sono: registro manual (deitou/acordou/qualidade), média, horário médio e regularidade

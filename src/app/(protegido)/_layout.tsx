@@ -2,6 +2,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
+import { sincronizarSeLiberado } from '@/lib/healthconnect';
 import { sincronizarAgendamentos } from '@/lib/lembretes';
 import { useSessao } from '@/lib/sessao';
 import { cores } from '@/lib/tema';
@@ -12,7 +13,9 @@ export default function LayoutProtegido() {
 
   // Ao entrar, alinha os lembretes agendados no celular com os salvos na conta.
   useEffect(() => {
-    if (sessao) sincronizarAgendamentos().catch(() => {});
+    if (!sessao) return;
+    sincronizarAgendamentos().catch(() => {});
+    sincronizarSeLiberado().catch(() => {});
   }, [sessao?.user.id]);
 
   if (carregando) {

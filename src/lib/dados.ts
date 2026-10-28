@@ -37,7 +37,7 @@ export type Perfil = {
   water_goal_ml: number;
 };
 
-type Atividade = { day: string; steps: number | null; active_kcal: number | null; resting_hr: number | null; sleep_minutes: number | null };
+type Atividade = { day: string; steps: number | null; active_kcal: number | null; total_kcal: number | null; resting_hr: number | null; sleep_minutes: number | null };
 type Nutricao = { day: string; kcal: number | null };
 type Treino = { title: string | null; started_at: string; ended_at: string | null; active_kcal: number | null; origin_app: string | null };
 
@@ -144,7 +144,7 @@ function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades
   return (dia: string) => {
     if (tmb == null) return null;
     const a = atividades.find((x) => x.day === dia);
-    return gastoDiario({ tmb, kcalAtivas: a?.active_kcal ?? null, fatorAtividade: perfil.activity_factor, ajusteKcal });
+    return gastoDiario({ tmb, kcalAtivas: a?.active_kcal ?? null, kcalTotais: a?.total_kcal ?? null, fatorAtividade: perfil.activity_factor, ajusteKcal });
   };
 }
 
@@ -203,7 +203,7 @@ function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividad
 async function carregarHistorico28(hoje: string) {
   const desde = somarDias(hoje, -27);
   const [atividades, nutricoes] = await Promise.all([
-    supabase.from('daily_activity').select('day, steps, active_kcal, resting_hr, sleep_minutes').gte('day', desde),
+    supabase.from('daily_activity').select('day, steps, active_kcal, total_kcal, resting_hr, sleep_minutes').gte('day', desde),
     supabase.from('nutrition_days').select('day, kcal').gte('day', desde),
   ]);
   if (atividades.error) throw atividades.error;

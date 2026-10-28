@@ -42,6 +42,10 @@ describe('gastoDiario', () => {
       origem: 'estimativa',
     });
   });
+  it('usa o total do relógio quando não há calorias ativas', () => {
+    assert.deepEqual(gastoDiario({ tmb: 1832, kcalAtivas: null, kcalTotais: 2500, fatorAtividade: 1.2 }), { kcal: 2500, origem: 'relogio' });
+    assert.equal(gastoDiario({ tmb: 1832, kcalAtivas: null, kcalTotais: 900, fatorAtividade: 1.2 }).origem, 'estimativa');
+  });
   it('aplica o ajuste da recalibração', () => {
     assert.equal(gastoDiario({ tmb: 1832, kcalAtivas: 600, fatorAtividade: 1.2, ajusteKcal: -90 }).kcal, 2342);
   });

@@ -1,0 +1,17 @@
+# A cada envio para a branch main, publica a nova versão do código (JavaScript)
+# no canal "preview". Os APKs preview instalados baixam a atualização ao abrir o app.
+# Só funciona para builds com o mesmo código nativo (runtimeVersion "fingerprint"):
+# se uma biblioteca nativa mudar, é preciso gerar um APK novo.
+name: Atualização pelo ar (preview)
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  publicar:
+    name: Publicar atualização
+    type: update
+    params:
+      channel: preview
+      platform: android

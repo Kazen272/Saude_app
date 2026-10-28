@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View, StyleSheet } from 'react-native';
+import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CartaoCheckin, CartaoSono } from '@/components/bemestar';
@@ -9,6 +9,7 @@ import { alertaDeficitAgressivo, resumirSono, type CheckIn, type Noite } from '@
 import { carregarCheckins, carregarNoites, salvarCheckin } from '@/lib/bemestar-dados';
 import { carregarResumoDoDia, registrarAgua, type ResumoDoDia } from '@/lib/dados';
 import { dataPorExtenso, decimal, diaCurto, diaLocal, milhar } from '@/lib/datas';
+import { nomeDoApp, sincronizar, sincronizarSeLiberado } from '@/lib/healthconnect';
 import { cores } from '@/lib/tema';
 
 export default function Hoje() {
@@ -34,11 +35,16 @@ export default function Hoje() {
   useFocusEffect(
     useCallback(() => {
       carregar();
+      // se o Health Connect estiver liberado e a última leitura for antiga, atualiza e recarrega
+      sincronizarSeLiberado()
+        .then((r) => r && carregar())
+        .catch(() => {});
     }, [carregar]),
   );
 
   async function atualizar() {
     setAtualizando(true);
+    if (Platform.OS === 'android') await sincronizar().catch(() => null);
     await carregar();
     setAtualizando(false);
   }
@@ -165,7 +171,7 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
         <Text style={{ fontSize: 13, color: cores.escuroSuave }}>
           {deficitHoje == null
             ? consumoKcal == null
-              ? 'aguardando a dieta do FatSecret'
+              ? 'aguardando a dieta (FatSecret via Health Connect)'
               : 'complete o perfil e registre o peso'
             : deficitHoje >= 0
               ? `déficit até agora · ≈ ${Math.round((deficitHoje / 7700) * 1000)} g de gordura`
@@ -173,7 +179,7 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
         </Text>
       </View>
       <View style={{ gap: 10 }}>
-        <LinhaBalanco titulo="Consumido · FatSecret" valor={consumoKcal} fracao={(consumoKcal ?? 0) / maior} cor={cores.laranjaVivo} />
+        <LinhaBalanco titulo="Consumido · dieta" valor={consumoKcal} fracao={(consumoKcal ?? 0) / maior} cor={cores.laranjaVivo} />
         <LinhaBalanco
           titulo={gasto?.origem === 'estimativa' ? 'Gasto · estimado' : 'Gasto · relógio + metabolismo'}
           valor={gasto?.kcal ?? null}
@@ -202,7 +208,9 @@ function CartaoTreino({ resumo }: { resumo: ResumoDoDia }) {
   return (
     <Cartao estilo={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: cores.cinza }}>Treino de hoje · Hevy</Text>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: cores.cinza }}>
+          Treino de hoje{treino?.origin_app ? ` · ${nomeDoApp(treino.origin_app)}` : ''}
+        </Text>
         {treino ? (
           <>
             <Text style={{ fontSize: 16, fontWeight: '700', color: cores.tinta }}>{treino.title ?? 'Treino'}</Text>
@@ -237,7 +245,7 @@ function CartaoRelogio({ resumo }: { resumo: ResumoDoDia }) {
           <Indicador valor={a.resting_hr != null ? String(a.resting_hr) : '—'} legenda="bpm em repouso" />
         </View>
       ) : (
-        <Nota>Os dados do relógio aparecem aqui quando a leitura do Health Connect estiver ligada.</Nota>
+        <Nota>Sem dados do relógio hoje. Conecte o Health Connect na aba Mais e sincronize o relógio pelo app dele.</Nota>
       )}
     </Cartao>
   );

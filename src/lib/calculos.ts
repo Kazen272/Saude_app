@@ -30,12 +30,18 @@ export function tmbMifflin(p: { sexo: Sexo; pesoKg: number; alturaCm: number; id
 export function gastoDiario(p: {
   tmb: number;
   kcalAtivas?: number | null;
+  /** Gasto total do dia medido pelo relógio (já inclui o metabolismo basal). */
+  kcalTotais?: number | null;
   fatorAtividade: number;
   ajusteKcal?: number;
 }): { kcal: number; origem: 'relogio' | 'estimativa' } {
   const ajuste = p.ajusteKcal ?? 0;
-  if (p.kcalAtivas != null) {
+  if (p.kcalAtivas != null && p.kcalAtivas > 0) {
     return { kcal: Math.round(p.tmb + p.kcalAtivas + ajuste), origem: 'relogio' };
+  }
+  // Alguns relógios só informam o total; ele só vale se for maior que o basal.
+  if (p.kcalTotais != null && p.kcalTotais > p.tmb) {
+    return { kcal: Math.round(p.kcalTotais + ajuste), origem: 'relogio' };
   }
   return { kcal: Math.round(p.tmb * p.fatorAtividade + ajuste), origem: 'estimativa' };
 }

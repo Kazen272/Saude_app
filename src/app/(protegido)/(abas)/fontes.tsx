@@ -4,7 +4,8 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Botao, Cabecalho, Campo, LinhaCampos, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
+import { CartaoHealthConnect } from '@/components/healthconnect';
+import { Botao, Cabecalho, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import type { Sexo } from '@/lib/calculos';
 import { carregarPerfil, salvarPerfil, type Perfil } from '@/lib/dados';
 import { decimal } from '@/lib/datas';
@@ -100,11 +101,7 @@ export default function Fontes() {
 
           <Text style={[estilos.rotulo, { marginTop: 6 }]}>Fontes de dados</Text>
 
-          <Cartao estilo={{ gap: 4, paddingVertical: 4 }}>
-            <LinhaFonte nome="Relógio" detalhe="Zepp / Mi Fitness · via Health Connect" estado="Em breve" />
-            <LinhaFonte nome="Hevy" detalhe="treinos · via Health Connect" estado="Em breve" />
-            <LinhaFonte nome="FatSecret" detalhe="dieta · aguardando o teste do Health Connect" estado="Verificar" tom="laranja" ultima />
-          </Cartao>
+          <CartaoHealthConnect />
 
           <Cartao estilo={{ gap: 14 }}>
             <Rotulo>Seu perfil</Rotulo>
@@ -181,29 +178,6 @@ function ItemMenu({
   );
 }
 
-function LinhaFonte({
-  nome,
-  detalhe,
-  estado,
-  tom = 'cinza',
-  ultima = false,
-}: {
-  nome: string;
-  detalhe: string;
-  estado: string;
-  tom?: 'verde' | 'laranja' | 'cinza';
-  ultima?: boolean;
-}) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: ultima ? 0 : 1, borderBottomColor: cores.linhaSuave }}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>{nome}</Text>
-        <Text style={{ fontSize: 12, color: cores.cinza }}>{detalhe}</Text>
-      </View>
-      <Pilula texto={estado} tom={tom} />
-    </View>
-  );
-}
 
 function Opcao({ texto, ativa, aoTocar }: { texto: string; ativa: boolean; aoTocar: () => void }) {
   return (
