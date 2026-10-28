@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Saúde",
+    "slug": "saude-app",
+    "scheme": "saudeapp",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kazen272.saudeapp"
+    },
+    "android": {
+      "package": "com.kazen272.saudeapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#E3EFE9",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6dc5fe85-0c02-4ae1-8e4e-78c0b5c62c37"
+      }
+    }
+  }
+}
