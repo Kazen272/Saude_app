@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -138,6 +138,16 @@ export default function Registrar() {
               </View>
             </View>
           </Cartao>
+
+          <Link href="/sono" asChild>
+            <Pressable accessibilityRole="link" style={[estilos.cartao, { flexDirection: 'row', alignItems: 'center' }]}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>Sono da última noite</Text>
+                <Text style={{ fontSize: 13, color: cores.cinza }}>que horas deitou e acordou</Text>
+              </View>
+              <Text style={{ fontSize: 22, color: cores.cinza }}>›</Text>
+            </Pressable>
+          </Link>
 
           <View style={{ backgroundColor: '#E7EAE4', borderRadius: 14, padding: 14 }}>
             <Nota>Treinos e refeições não precisam ser digitados: vêm do Hevy e do FatSecret.</Nota>

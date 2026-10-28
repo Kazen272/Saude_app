@@ -1,4 +1,5 @@
-import { useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Link, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -88,7 +89,16 @@ export default function Fontes() {
     <SafeAreaView style={estilos.tela} edges={['top']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
-          <Cabecalho sobre="Perfil e de onde vêm seus dados" titulo="Fontes" />
+          <Cabecalho sobre="Relatórios, exames, lembretes e perfil" titulo="Mais" />
+
+          <Cartao estilo={{ gap: 0, paddingVertical: 4 }}>
+            <ItemMenu href="/relatorio" icone="stats-chart-outline" titulo="Relatório da semana" detalhe="o que melhorou e o que piorou" />
+            <ItemMenu href="/exames" icone="water-outline" titulo="Exames de sangue" detalhe="resultados, referências e histórico" />
+            <ItemMenu href="/sono" icone="moon-outline" titulo="Sono" detalhe="registrar noites e ver a semana" />
+            <ItemMenu href="/lembretes" icone="notifications-outline" titulo="Lembretes" detalhe="água, pesagem, check-in e os seus" ultimo />
+          </Cartao>
+
+          <Text style={[estilos.rotulo, { marginTop: 6 }]}>Fontes de dados</Text>
 
           <Cartao estilo={{ gap: 4, paddingVertical: 4 }}>
             <LinhaFonte nome="Relógio" detalhe="Zepp / Mi Fitness · via Health Connect" estado="Em breve" />
@@ -136,6 +146,38 @@ export default function Fontes() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function ItemMenu({
+  href,
+  icone,
+  titulo,
+  detalhe,
+  ultimo = false,
+}: {
+  href: Href;
+  icone: keyof typeof Ionicons.glyphMap;
+  titulo: string;
+  detalhe: string;
+  ultimo?: boolean;
+}) {
+  return (
+    <Link href={href} asChild>
+      <Pressable
+        accessibilityRole="link"
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: ultimo ? 0 : 1, borderBottomColor: cores.linhaSuave }}
+      >
+        <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: cores.verdeClaro, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={icone} size={20} color={cores.verdeEscuro} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>{titulo}</Text>
+          <Text style={{ fontSize: 12, color: cores.cinza }}>{detalhe}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={cores.cinza} />
+      </Pressable>
+    </Link>
   );
 }
 

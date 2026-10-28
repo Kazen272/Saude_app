@@ -3,9 +3,12 @@ import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CartaoCheckin, CartaoSono } from '@/components/bemestar';
 import { Botao, Cabecalho, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
+import { alertaDeficitAgressivo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
+import { carregarCheckins, carregarNoites, salvarCheckin } from '@/lib/bemestar-dados';
 import { carregarResumoDoDia, registrarAgua, type ResumoDoDia } from '@/lib/dados';
-import { dataPorExtenso, decimal, diaCurto, milhar } from '@/lib/datas';
+import { dataPorExtenso, decimal, diaCurto, diaLocal, milhar } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
 export default function Hoje() {
@@ -13,11 +16,16 @@ export default function Hoje() {
   const [erro, setErro] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
   const [salvandoAgua, setSalvandoAgua] = useState(false);
+  const [noites, setNoites] = useState<Noite[]>([]);
+  const [checkins, setCheckins] = useState<CheckIn[]>([]);
 
   const carregar = useCallback(async () => {
     try {
       setErro(null);
-      setResumo(await carregarResumoDoDia());
+      const [r, n, c] = await Promise.all([carregarResumoDoDia(), carregarNoites(7), carregarCheckins(3)]);
+      setResumo(r);
+      setNoites(n);
+      setCheckins(c);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao carregar os dados.');
     }
@@ -49,7 +57,21 @@ export default function Hoje() {
     }
   }
 
+  async function mudarCheckin(campo: 'energia' | 'fome' | 'humor', valor: number) {
+    const hoje = diaLocal();
+    const anterior = checkins;
+    const atual = checkins.find((c) => c.dia === hoje) ?? { dia: hoje, energia: null, fome: null, humor: null };
+    setCheckins([...checkins.filter((c) => c.dia !== hoje), { ...atual, [campo]: valor }]);
+    try {
+      await salvarCheckin(hoje, { [campo]: valor });
+    } catch {
+      setCheckins(anterior);
+      setErro('Não foi possível salvar o check-in.');
+    }
+  }
+
   const nome = resumo?.perfil.display_name?.split(' ')[0];
+  const checkinHoje = checkins.find((c) => c.dia === diaLocal()) ?? null;
 
   return (
     <SafeAreaView style={estilos.tela} edges={['top']}>
@@ -111,6 +133,8 @@ export default function Hoje() {
           </View>
         )}
 
+        {resumo && <CartaoCheckin checkin={checkinHoje} alerta={alertaDeficitAgressivo(checkins)} aoMudar={mudarCheckin} />}
+        {resumo && <CartaoSono ultima={noites.at(-1) ?? null} resumo={resumirSono(noites)} />}
         {resumo && <CartaoTreino resumo={resumo} />}
         {resumo && <CartaoRelogio resumo={resumo} />}
         {resumo && <CartaoProjecao resumo={resumo} />}

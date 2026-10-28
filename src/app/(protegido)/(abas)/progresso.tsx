@@ -1,10 +1,13 @@
-import { useFocusEffect } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GradeCheckins, GraficoSono } from '@/components/bemestar';
 import { GraficoDeficit, GraficoPeso } from '@/components/graficos';
 import { Cabecalho, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { formatarDuracao, mediaCampo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
+import { carregarCheckins, carregarNoites } from '@/lib/bemestar-dados';
 import { carregarProgresso, type Progresso as DadosProgresso } from '@/lib/dados';
 import { decimal, diaCurto, diaLocal, milhar } from '@/lib/datas';
 import { cores } from '@/lib/tema';
@@ -20,11 +23,16 @@ export default function Progresso() {
   const [dados, setDados] = useState<DadosProgresso | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
+  const [noites, setNoites] = useState<Noite[]>([]);
+  const [checkins, setCheckins] = useState<CheckIn[]>([]);
 
   const carregar = useCallback(async (dias: number) => {
     try {
       setErro(null);
-      setDados(await carregarProgresso(dias));
+      const [p, n, c] = await Promise.all([carregarProgresso(dias), carregarNoites(7), carregarCheckins(7)]);
+      setDados(p);
+      setNoites(n);
+      setCheckins(c);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao carregar.');
     }
@@ -59,6 +67,16 @@ export default function Progresso() {
         }
       >
         <Cabecalho sobre={atual.sobre} titulo="Progresso" />
+
+        <Link href="/relatorio" asChild>
+          <Pressable accessibilityRole="link" style={[estilos.cartao, { backgroundColor: cores.tinta, flexDirection: 'row', alignItems: 'center' }]}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>Relatório da semana</Text>
+              <Text style={{ fontSize: 13, color: cores.escuroSuave }}>o que melhorou e o que piorou</Text>
+            </View>
+            <Text style={{ fontSize: 22, color: '#FFFFFF' }}>›</Text>
+          </Pressable>
+        </Link>
 
         <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, backgroundColor: '#E7EAE4', borderRadius: 12, padding: 4 }}>
           {PERIODOS.map((p) => {
@@ -140,6 +158,33 @@ export default function Progresso() {
             valor={dados ? `${dados.treinosSemana.quantidade}${dados.treinosSemana.kcal ? ` · ${milhar(dados.treinosSemana.kcal)} kcal` : ''}` : '—'}
           />
           <LinhaResumo titulo="Água (média/dia)" valor={dados ? `${decimal(dados.aguaMediaMl / 1000)} L` : '—'} ultima />
+        </Cartao>
+
+        {/* Sono */}
+        <Cartao estilo={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <View style={{ gap: 2 }}>
+              <Rotulo>Sono · últimas 7 noites</Rotulo>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>
+                {resumirSono(noites).mediaMin != null ? formatarDuracao(resumirSono(noites).mediaMin as number) : '—'}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 13, color: cores.cinza }}>média por noite</Text>
+          </View>
+          <GraficoSono noites={noites} />
+        </Cartao>
+
+        {/* Check-in */}
+        <Cartao estilo={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Rotulo>Check-in · 7 dias</Rotulo>
+            <Text style={{ fontSize: 12, color: cores.cinza }}>
+              {checkins.length
+                ? `energia ${decimal(mediaCampo(checkins, 'energia') ?? 0)} · fome ${decimal(mediaCampo(checkins, 'fome') ?? 0)}`
+                : ''}
+            </Text>
+          </View>
+          <GradeCheckins checkins={checkins} />
         </Cartao>
 
         {/* Previsto × real */}

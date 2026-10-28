@@ -11,7 +11,19 @@ import {
   type Sexo,
 } from './calculos';
 import { diaLocal, limitesDoDia, somarDias } from './datas';
-import { previstoVersusReal, resumirPeriodo, type DiaBalanco, type PrevistoReal, type ResumoPeriodo } from './relatorios';
+import { alertaDeficitAgressivo, mediaCampo, resumirSono } from './bemestar';
+import { carregarCheckins, carregarNoites } from './bemestar-dados';
+import {
+  compararSemanas,
+  previstoVersusReal,
+  resumirPeriodo,
+  semanaDoRelatorio,
+  type DiaBalanco,
+  type ItemComparacao,
+  type MetricasSemana,
+  type PrevistoReal,
+  type ResumoPeriodo,
+} from './relatorios';
 import { supabase } from './supabase';
 
 export type Perfil = {
@@ -291,5 +303,76 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
     deficitHoje: balancoHoje.deficit,
     deficitMedio: analise.deficitMedio,
     projecao: analise.projecao,
+  };
+}
+
+export type RelatorioSemanal = {
+  semana: { inicio: string; fim: string };
+  atual: MetricasSemana;
+  anterior: MetricasSemana;
+  itens: ItemComparacao[];
+  alertaDeficit: boolean;
+  noitesAbaixoDe7h: number;
+  diasComCheckin: number;
+};
+
+/** Métricas da semana do relatório (seg–dom) comparadas com a semana anterior. */
+export async function carregarRelatorioSemanal(): Promise<RelatorioSemanal> {
+  const hoje = diaLocal();
+  const semana = semanaDoRelatorio(hoje);
+  const inicioAnterior = somarDias(semana.inicio, -7);
+  const [a, m, d] = inicioAnterior.split('-').map(Number);
+  const [af, mf, df] = semana.fim.split('-').map(Number);
+  const janela = { inicio: new Date(a, m - 1, d).toISOString(), fim: new Date(af, mf - 1, df + 1).toISOString() };
+
+  const [perfil, pesagens, historico, noites, checkins, agua, treinos] = await Promise.all([
+    carregarPerfil(),
+    carregarPesagens(42),
+    carregarHistorico28(hoje),
+    carregarNoites(14, semana.fim),
+    carregarCheckins(14, semana.fim),
+    supabase.from('water_entries').select('amount_ml, logged_at').gte('logged_at', janela.inicio).lt('logged_at', janela.fim),
+    supabase.from('workouts').select('started_at').gte('started_at', janela.inicio).lt('started_at', janela.fim),
+  ]);
+  if (agua.error) throw agua.error;
+  if (treinos.error) throw treinos.error;
+
+  const analise = analisar({ perfil, pesagens, ...historico, hoje });
+
+  const metricas = (inicio: string): MetricasSemana => {
+    const fim = somarDias(inicio, 6);
+    const dentro = (dia: string) => dia >= inicio && dia <= fim;
+    const diaDe = (iso: string) => diaLocal(new Date(iso));
+    const pesos = pesagens.filter((p) => dentro(p.dia)).map((p) => p.pesoKg);
+    const deficits = Array.from({ length: 7 }, (_, i) => analise.balancoDe(somarDias(inicio, i)).deficit).filter(
+      (x): x is number => x != null,
+    );
+    const aguaSemana = (agua.data ?? []).filter((r) => dentro(diaDe(r.logged_at as string)));
+    const sono = resumirSono(noites.filter((n) => dentro(n.dia)));
+    const chk = checkins.filter((c) => dentro(c.dia));
+    return {
+      pesoMedioKg: pesos.length ? Math.round((pesos.reduce((s, p) => s + p, 0) / pesos.length) * 10) / 10 : null,
+      deficitTotal: deficits.length ? deficits.reduce((s, x) => s + x, 0) : null,
+      treinos: (treinos.data ?? []).filter((t) => dentro(diaDe(t.started_at as string))).length,
+      aguaMediaMl: aguaSemana.length ? Math.round(aguaSemana.reduce((s, r) => s + Number(r.amount_ml), 0) / 7) : null,
+      sonoMedioMin: sono.mediaMin,
+      variacaoDormirMin: sono.variacaoMin,
+      energia: mediaCampo(chk, 'energia'),
+      fome: mediaCampo(chk, 'fome'),
+      humor: mediaCampo(chk, 'humor'),
+    };
+  };
+
+  const atual = metricas(semana.inicio);
+  const anterior = metricas(inicioAnterior);
+  const checkinsSemana = checkins.filter((c) => c.dia >= semana.inicio && c.dia <= semana.fim);
+  return {
+    semana,
+    atual,
+    anterior,
+    itens: compararSemanas(atual, anterior),
+    alertaDeficit: alertaDeficitAgressivo(checkinsSemana),
+    noitesAbaixoDe7h: resumirSono(noites.filter((n) => n.dia >= semana.inicio && n.dia <= semana.fim)).abaixoDe7h,
+    diasComCheckin: checkinsSemana.length,
   };
 }

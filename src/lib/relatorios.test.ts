@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { previstoVersusReal, resumirPeriodo } from './relatorios.ts';
+import { compararSemanas, previstoVersusReal, resumirPeriodo, semanaDoRelatorio, type MetricasSemana } from './relatorios.ts';
 
 describe('resumirPeriodo', () => {
   it('soma só dias completos no déficit', () => {
@@ -30,5 +30,34 @@ describe('previstoVersusReal', () => {
       realKg: 1.5,
       diferencaKg: -0.5,
     });
+  });
+});
+
+
+describe('semanaDoRelatorio', () => {
+  it('no domingo, termina hoje', () => {
+    assert.deepEqual(semanaDoRelatorio('2026-11-01'), { inicio: '2026-10-26', fim: '2026-11-01' });
+  });
+  it('nos outros dias, é a última semana completa', () => {
+    assert.deepEqual(semanaDoRelatorio('2026-10-28'), { inicio: '2026-10-19', fim: '2026-10-25' });
+  });
+});
+
+describe('compararSemanas', () => {
+  const vazia: MetricasSemana = {
+    pesoMedioKg: null, deficitTotal: null, treinos: 0, aguaMediaMl: null, sonoMedioMin: null,
+    variacaoDormirMin: null, energia: null, fome: null, humor: null,
+  };
+  it('respeita a direção de cada métrica', () => {
+    const r = compararSemanas(
+      { ...vazia, pesoMedioKg: 88.4, sonoMedioMin: 380, fome: 4, treinos: 4 },
+      { ...vazia, pesoMedioKg: 89.0, sonoMedioMin: 420, fome: 4.1, treinos: 3 },
+    );
+    const t = Object.fromEntries(r.map((i) => [i.chave, i.tendencia]));
+    assert.equal(t.pesoMedioKg, 'melhorou');
+    assert.equal(t.sonoMedioMin, 'piorou');
+    assert.equal(t.fome, 'estavel');
+    assert.equal(t.treinos, 'melhorou');
+    assert.equal(t.energia, 'sem_dados');
   });
 });
