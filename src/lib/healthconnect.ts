@@ -301,6 +301,11 @@ async function executarSincronizacao(): Promise<EstadoSync> {
         const { error } = await supabase.from('workouts').upsert(linhas, { onConflict: 'user_id,source,external_id' });
         if (error) throw error;
       }
+      // Treino apagado no app de origem (ou que virou duplicado) sai daqui também.
+      let limpar = supabase.from('workouts').delete().eq('user_id', uid).eq('source', 'health_connect').gte('started_at', inicio);
+      if (linhas.length) limpar = limpar.not('external_id', 'in', `(${linhas.map((l) => `"${l.external_id.replace(/"/g, '')}"`).join(',')})`);
+      const { error: erroLimpeza } = await limpar;
+      if (erroLimpeza) throw erroLimpeza;
       estado.origens.treinos = [...new Set(escolhidas.map((s) => s.metadata?.dataOrigin).filter((o): o is string => !!o))];
       estado.contagem.treinos = linhas.length;
     }
