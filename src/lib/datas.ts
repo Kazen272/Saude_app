@@ -47,3 +47,44 @@ export function milhar(n: number): string {
 export function numeroCurto(n: number, max = 2): string {
   return String(Math.round(n * 10 ** max) / 10 ** max).replace('.', ',');
 }
+
+/** Máscara de data enquanto digita: "28101992" → "28/10/1992". */
+export function mascaraData(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+/** Máscara de hora enquanto digita: "2330" → "23:30". */
+export function mascaraHora(texto: string): string {
+  const d = texto.replace(/\D/g, '').slice(0, 4);
+  if (d.length <= 2) return d;
+  return `${d.slice(0, 2)}:${d.slice(2)}`;
+}
+
+/** "Hoje", "Ontem" ou "qua, 21 out". */
+export function nomeDoDia(dia: string, hoje: string = diaLocal()): string {
+  if (dia === hoje) return 'Hoje';
+  if (dia === somarDias(hoje, -1)) return 'Ontem';
+  const [a, m, d] = dia.split('-').map(Number);
+  const nome = DIAS[new Date(a, m - 1, d).getDay()].slice(0, 3);
+  return `${nome}, ${diaCurto(dia)}`;
+}
+
+/** Segunda-feira da semana de um dia (YYYY-MM-DD). */
+export function inicioDaSemana(dia: string): string {
+  const [a, m, d] = dia.split('-').map(Number);
+  const semana = new Date(a, m - 1, d).getDay(); // 0 = domingo
+  return somarDias(dia, -((semana + 6) % 7));
+}
+
+/** Agrupa valores diários por semana (seg–dom), das `n` semanas até a atual. */
+export function porSemana<T>(itens: { dia: string; valor: T }[], n: number, hoje: string = diaLocal()): { semana: string; valores: T[] }[] {
+  const atual = inicioDaSemana(hoje);
+  const semanas = Array.from({ length: n }, (_, i) => somarDias(atual, -7 * (n - 1 - i)));
+  return semanas.map((semana) => ({
+    semana,
+    valores: itens.filter((x) => x.dia >= semana && x.dia <= somarDias(semana, 6)).map((x) => x.valor),
+  }));
+}

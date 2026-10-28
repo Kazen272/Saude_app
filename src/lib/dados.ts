@@ -1,7 +1,11 @@
 import {
   ajusteDeGasto,
   deficit,
+  fracaoDoDia,
   gastoDiario,
+  metaProteina,
+  relacaoCinturaAltura,
+  ritmoSemanal,
   idadeEmAnos,
   mediaMovel,
   projetarMeta,
@@ -9,8 +13,9 @@ import {
   type Pesagem,
   type Projecao,
   type Sexo,
+  type NivelCintura,
 } from './calculos';
-import { diaLocal, limitesDoDia, somarDias } from './datas';
+import { diaLocal, limitesDoDia, porSemana, somarDias } from './datas';
 import { alertaDeficitAgressivo, mediaCampo, resumirSono } from './bemestar';
 import { carregarCheckins, carregarNoites } from './bemestar-dados';
 import {
@@ -38,7 +43,7 @@ export type Perfil = {
 };
 
 type Atividade = { day: string; steps: number | null; active_kcal: number | null; total_kcal: number | null; resting_hr: number | null; sleep_minutes: number | null };
-type Nutricao = { day: string; kcal: number | null };
+type Nutricao = { day: string; kcal: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null };
 type Treino = { title: string | null; started_at: string; ended_at: string | null; active_kcal: number | null; origin_app: string | null };
 
 export type ResumoDoDia = {
@@ -54,6 +59,13 @@ export type ResumoDoDia = {
   deficitHoje: number | null;
   deficitMedio: number | null;
   projecao: Projecao | null;
+  /** O balanço de hoje conta o dia só até agora. */
+  horaParcial: string;
+  /** Ontem: dia completo, o número mais confiável. */
+  ontem: { gasto: number | null; consumo: number | null; deficit: number | null };
+  macros: { proteina: number | null; carbo: number | null; gordura: number | null } | null;
+  metaProteina: { min: number; max: number } | null;
+  ritmo: { kgPorSemana: number; pctPorSemana: number } | null;
 };
 
 // Postgres devolve numeric como string; converte para número.
@@ -86,8 +98,75 @@ export async function salvarPerfil(mudancas: Partial<Omit<Perfil, 'id'>>, id: st
   if (error) throw error;
 }
 
-export async function registrarAgua(ml: number): Promise<void> {
-  const { error } = await supabase.from('water_entries').insert({ amount_ml: ml });
+/** Registra água; num dia passado, fica às 12h daquele dia. Devolve o id para poder desfazer. */
+export async function registrarAgua(ml: number, dia: string = diaLocal()): Promise<number | null> {
+  const linha: Record<string, unknown> = { amount_ml: ml };
+  if (dia !== diaLocal()) {
+    const [a, m, d] = dia.split('-').map(Number);
+    linha.logged_at = new Date(a, m - 1, d, 12).toISOString();
+  }
+  const { data, error } = await supabase.from('water_entries').insert(linha).select('id').single();
+  if (error) throw error;
+  return (data?.id as number) ?? null;
+}
+
+export async function apagarAgua(id: number): Promise<void> {
+  const { error } = await supabase.from('water_entries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export type RegistrosDoDia = {
+  corpo: { pesoKg: number | null; cinturaCm: number | null; quadrilCm: number | null; gorduraPct: number | null; origem: string } | null;
+  agua: { id: number; ml: number; hora: string }[];
+  sono: { origem: string; deitou: string; acordou: string; qualidade: number | null }[];
+  checkin: { energia: number | null; fome: number | null; humor: number | null } | null;
+};
+
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+/** Tudo o que foi registrado num dia, para revisar, corrigir ou apagar. */
+export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDia> {
+  const [a, m, d] = dia.split('-').map(Number);
+  const { inicio, fim } = limitesDoDia(new Date(a, m - 1, d));
+  const [corpo, agua, sono, checkin] = await Promise.all([
+    supabase.from('body_entries').select('weight_kg, waist_cm, hip_cm, body_fat_pct, source').eq('measured_on', dia).maybeSingle(),
+    supabase.from('water_entries').select('id, amount_ml, logged_at').gte('logged_at', inicio).lt('logged_at', fim).order('logged_at'),
+    supabase.from('sleep_sessions').select('bed_at, wake_at, quality, source').eq('night', dia),
+    supabase.from('daily_checkins').select('energy, hunger, mood').eq('day', dia).maybeSingle(),
+  ]);
+  for (const r of [corpo, agua, sono, checkin]) if (r.error) throw r.error;
+  return {
+    corpo: corpo.data
+      ? {
+          pesoKg: num(corpo.data.weight_kg),
+          cinturaCm: num(corpo.data.waist_cm),
+          quadrilCm: num(corpo.data.hip_cm),
+          gorduraPct: num(corpo.data.body_fat_pct),
+          origem: corpo.data.source as string,
+        }
+      : null,
+    agua: (agua.data ?? []).map((x) => ({ id: x.id as number, ml: Number(x.amount_ml), hora: hhmm(x.logged_at as string) })),
+    sono: (sono.data ?? []).map((x) => ({
+      origem: x.source as string,
+      deitou: hhmm(x.bed_at as string),
+      acordou: hhmm(x.wake_at as string),
+      qualidade: (x.quality as number | null) ?? null,
+    })),
+    checkin: checkin.data ? { energia: checkin.data.energy as number | null, fome: checkin.data.hunger as number | null, humor: checkin.data.mood as number | null } : null,
+  };
+}
+
+export async function apagarCorpo(dia: string): Promise<void> {
+  const { error } = await supabase.from('body_entries').delete().eq('measured_on', dia);
+  if (error) throw error;
+}
+
+/** Apaga o sono digitado à mão num dia (o do relógio volta a valer). */
+export async function apagarSonoManual(dia: string): Promise<void> {
+  const { error } = await supabase.from('sleep_sessions').delete().eq('night', dia).eq('source', 'manual');
   if (error) throw error;
 }
 
@@ -98,10 +177,15 @@ export async function registrarCorpo(entrada: {
   quadrilCm?: number | null;
   gorduraPct?: number | null;
 }): Promise<void> {
-  const linha: Record<string, unknown> = { measured_on: entrada.dia, weight_kg: entrada.pesoKg, source: 'manual' };
-  if (entrada.cinturaCm != null) linha.waist_cm = entrada.cinturaCm;
-  if (entrada.quadrilCm != null) linha.hip_cm = entrada.quadrilCm;
-  if (entrada.gorduraPct != null) linha.body_fat_pct = entrada.gorduraPct;
+  // O formulário já vem preenchido com o que existe no dia: campo apagado = valor apagado.
+  const linha: Record<string, unknown> = {
+    measured_on: entrada.dia,
+    weight_kg: entrada.pesoKg,
+    waist_cm: entrada.cinturaCm ?? null,
+    hip_cm: entrada.quadrilCm ?? null,
+    body_fat_pct: entrada.gorduraPct ?? null,
+    source: 'manual',
+  };
   const { data: sessao } = await supabase.auth.getUser();
   const { error } = await supabase
     .from('body_entries')
@@ -141,10 +225,19 @@ function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades
           idade: idadeEmAnos(perfil.birth_date as string, hoje),
         })
       : null;
+  const agora = new Date();
+  const fracaoHoje = fracaoDoDia(agora.getHours() * 60 + agora.getMinutes());
   return (dia: string) => {
     if (tmb == null) return null;
     const a = atividades.find((x) => x.day === dia);
-    return gastoDiario({ tmb, kcalAtivas: a?.active_kcal ?? null, kcalTotais: a?.total_kcal ?? null, fatorAtividade: perfil.activity_factor, ajusteKcal });
+    return gastoDiario({
+      tmb,
+      kcalAtivas: a?.active_kcal ?? null,
+      kcalTotais: a?.total_kcal ?? null,
+      fatorAtividade: perfil.activity_factor,
+      ajusteKcal,
+      fracaoDoDia: dia === hoje ? fracaoHoje : 1,
+    });
   };
 }
 
@@ -204,11 +297,18 @@ async function carregarHistorico28(hoje: string) {
   const desde = somarDias(hoje, -27);
   const [atividades, nutricoes] = await Promise.all([
     supabase.from('daily_activity').select('day, steps, active_kcal, total_kcal, resting_hr, sleep_minutes').gte('day', desde),
-    supabase.from('nutrition_days').select('day, kcal').gte('day', desde),
+    supabase.from('nutrition_days').select('day, kcal, protein_g, carbs_g, fat_g').gte('day', desde),
   ]);
   if (atividades.error) throw atividades.error;
   if (nutricoes.error) throw nutricoes.error;
-  return { atividades: (atividades.data ?? []) as Atividade[], nutricoes: (nutricoes.data ?? []) as Nutricao[] };
+  const nutricoesNum = (nutricoes.data ?? []).map((n) => ({
+    day: n.day as string,
+    kcal: num(n.kcal),
+    protein_g: num(n.protein_g),
+    carbs_g: num(n.carbs_g),
+    fat_g: num(n.fat_g),
+  }));
+  return { atividades: (atividades.data ?? []) as Atividade[], nutricoes: nutricoesNum as Nutricao[] };
 }
 
 export type Progresso = {
@@ -224,6 +324,12 @@ export type Progresso = {
   aguaMediaMl: number;
   previstoReal: (PrevistoReal & { dias: number }) | null;
   ajusteKcalDia: number;
+  ritmo: { kgPorSemana: number; pctPorSemana: number } | null;
+  proteinaMediaSemana: number | null;
+  metaProteina: { min: number; max: number } | null;
+  cintura: { atual: number; dia: string; inicial: number; diaInicial: string; relacao: { valor: number; nivel: NivelCintura } | null } | null;
+  /** 8 semanas (seg–dom), da mais antiga para a atual. */
+  tendencias: { semana: string; passos: number | null; fcRepouso: number | null; treinos: number }[];
 };
 
 /** Tudo o que a aba Progresso mostra, para o período escolhido (7, 30 ou 56 dias). */
@@ -233,23 +339,62 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
   const [a7, m7, d7] = inicio7.split('-').map(Number);
   const limites7 = { inicio: limitesDoDia(new Date(a7, m7 - 1, d7)).inicio, fim: limitesDoDia().fim };
 
-  const [perfil, pesagensTodas, historico, treinos, agua] = await Promise.all([
+  const inicio56 = somarDias(hoje, -62);
+  const [a56, m56, d56] = inicio56.split('-').map(Number);
+  const [perfil, pesagensTodas, historico, treinos, agua, atividade56, treinos56, cinturas] = await Promise.all([
     carregarPerfil(),
     carregarPesagens(Math.max(periodoDias, 28) + 7),
     carregarHistorico28(hoje),
     supabase.from('workouts').select('active_kcal').gte('started_at', limites7.inicio).lt('started_at', limites7.fim),
     supabase.from('water_entries').select('amount_ml').gte('logged_at', limites7.inicio).lt('logged_at', limites7.fim),
+    supabase.from('daily_activity').select('day, steps, resting_hr').gte('day', inicio56),
+    supabase.from('workouts').select('started_at').gte('started_at', new Date(a56, m56 - 1, d56).toISOString()),
+    supabase.from('body_entries').select('measured_on, waist_cm').not('waist_cm', 'is', null).order('measured_on'),
   ]);
-  if (treinos.error) throw treinos.error;
-  if (agua.error) throw agua.error;
+  for (const r of [treinos, agua, atividade56, treinos56, cinturas]) if (r.error) throw r.error;
+
+  // Tendências semanais do relógio e dos treinos
+  const ativ = (atividade56.data ?? []) as { day: string; steps: number | null; resting_hr: number | null }[];
+  const media = (xs: number[]) => (xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : null);
+  const semanasPassos = porSemana(ativ.filter((a) => a.steps != null).map((a) => ({ dia: a.day, valor: Number(a.steps) })), 8, hoje);
+  const semanasFc = porSemana(ativ.filter((a) => a.resting_hr != null).map((a) => ({ dia: a.day, valor: Number(a.resting_hr) })), 8, hoje);
+  const semanasTreinos = porSemana(((treinos56.data ?? []) as { started_at: string }[]).map((t) => ({ dia: diaLocal(new Date(t.started_at)), valor: 1 })), 8, hoje);
+  const tendencias = semanasPassos.map((s, i) => ({
+    semana: s.semana,
+    passos: media(s.valores),
+    fcRepouso: media(semanasFc[i].valores),
+    treinos: semanasTreinos[i].valores.length,
+  }));
+
+  // Cintura: primeira e última medida, e relação com a altura
+  const listaCintura = ((cinturas.data ?? []) as { measured_on: string; waist_cm: number | string }[]).map((c) => ({ dia: c.measured_on, cm: Number(c.waist_cm) }));
+  const ultimaCintura = listaCintura.at(-1);
+  const cintura = ultimaCintura
+    ? {
+        atual: ultimaCintura.cm,
+        dia: ultimaCintura.dia,
+        inicial: listaCintura[0].cm,
+        diaInicial: listaCintura[0].dia,
+        relacao: perfil.height_cm ? relacaoCinturaAltura(ultimaCintura.cm, perfil.height_cm) : null,
+      }
+    : null;
 
   const analise = analisar({ perfil, pesagens: pesagensTodas, ...historico, hoje });
   const inicioPeriodo = somarDias(hoje, -(periodoDias - 1));
-  const ultimos7 = Array.from({ length: 7 }, (_, i) => analise.balancoDe(somarDias(inicio7, i)));
+  // 7 dias completos (até ontem): o dia de hoje ainda está pela metade.
+  const ultimos7 = Array.from({ length: 7 }, (_, i) => analise.balancoDe(somarDias(inicio7, i - 1)));
   const listaTreinos = (treinos.data ?? []) as { active_kcal: number | null }[];
   const aguaTotal = (agua.data ?? []).reduce((s, r) => s + Number(r.amount_ml), 0);
+  const proteinas = historico.nutricoes
+    .filter((n) => n.day >= inicio7 && n.day < hoje && n.protein_g != null)
+    .map((n) => n.protein_g as number);
 
   return {
+    ritmo: ritmoSemanal(analise.medias),
+    proteinaMediaSemana: proteinas.length ? Math.round(proteinas.reduce((s, x) => s + x, 0) / proteinas.length) : null,
+    metaProteina: analise.pesoRef != null ? metaProteina(analise.pesoRef) : null,
+    cintura,
+    tendencias,
     perfil,
     perfilCompleto: perfilEstaCompleto(perfil),
     pesagens: pesagensTodas.filter((p) => p.dia >= inicioPeriodo),
@@ -289,8 +434,16 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
     mediaHoje != null && mediaSemanaPassada != null ? Math.round((mediaHoje - mediaSemanaPassada) * 10) / 10 : null;
 
   const balancoHoje = analise.balancoDe(hoje);
+  const balancoOntem = analise.balancoDe(somarDias(hoje, -1));
+  const nutriHoje = historico.nutricoes.find((n) => n.day === hoje);
+  const agora = new Date();
 
   return {
+    horaParcial: `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`,
+    ontem: { gasto: balancoOntem.gasto, consumo: balancoOntem.consumo, deficit: balancoOntem.deficit },
+    macros: nutriHoje ? { proteina: nutriHoje.protein_g, carbo: nutriHoje.carbs_g, gordura: nutriHoje.fat_g } : null,
+    metaProteina: mediaHoje != null ? metaProteina(mediaHoje) : null,
+    ritmo: ritmoSemanal(analise.medias),
     perfil,
     perfilCompleto: perfilEstaCompleto(perfil),
     pesoAtual,

@@ -1,6 +1,7 @@
 import { Children, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextInputProps, type ViewStyle } from 'react-native';
 
+import { diaLocal, mascaraData, mascaraHora, nomeDoDia, somarDias } from '@/lib/datas';
 import { cores, raio } from '@/lib/tema';
 
 /**
@@ -151,3 +152,75 @@ export const estilos = StyleSheet.create({
     backgroundColor: '#FAFBF9',
   },
 });
+
+/** Escolhe um dia: ‹ Hoje ›. Não deixa ir para o futuro nem mais de `maxDias` para trás. */
+export function SeletorDia({ dia, aoMudar, maxDias = 60 }: { dia: string; aoMudar: (d: string) => void; maxDias?: number }) {
+  const hoje = diaLocal();
+  const podeVoltar = dia > somarDias(hoje, -maxDias);
+  const podeAvancar = dia < hoje;
+  const Seta = ({ texto, rotulo, ativo, aoTocar }: { texto: string; rotulo: string; ativo: boolean; aoTocar: () => void }) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      accessibilityState={{ disabled: !ativo }}
+      disabled={!ativo}
+      onPress={aoTocar}
+      style={{ width: 48, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? cores.linhaSuave : 'transparent' }}
+    >
+      <Text style={{ fontSize: 22, fontWeight: '700', color: ativo ? cores.tinta : cores.linha }}>{texto}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Seta texto="‹" rotulo="Dia anterior" ativo={podeVoltar} aoTocar={() => aoMudar(somarDias(dia, -1))} />
+      <Text accessibilityLiveRegion="polite" style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '800', color: cores.tinta }}>
+        {nomeDoDia(dia, hoje)}
+      </Text>
+      <Seta texto="›" rotulo="Dia seguinte" ativo={podeAvancar} aoTocar={() => aoMudar(somarDias(dia, 1))} />
+    </View>
+  );
+}
+
+/** Hora com máscara (digite 2330 → 23:30) e botões de −15 / +15 minutos. */
+export function SeletorHora({ rotulo, valor, aoMudar }: { rotulo: string; valor: string; aoMudar: (v: string) => void }) {
+  const mover = (delta: number) => {
+    const m = valor.match(/^(\d{2}):(\d{2})$/);
+    const atual = m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+    const novo = (((atual + delta) % 1440) + 1440) % 1440;
+    aoMudar(`${String(Math.floor(novo / 60)).padStart(2, '0')}:${String(novo % 60).padStart(2, '0')}`);
+  };
+  const botao = (texto: string, delta: number) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${rotulo}: ${delta > 0 ? 'mais' : 'menos'} 15 minutos`}
+      onPress={() => mover(delta)}
+      style={{ width: 44, height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.linhaSuave }}
+    >
+      <Text style={{ fontSize: 13, fontWeight: '800', color: cores.tintaSuave }}>{texto}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={{ gap: 4 }}>
+      <Text style={estilos.campoRotulo}>{rotulo}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {botao('−15', -15)}
+        <TextInput
+          accessibilityLabel={rotulo}
+          value={valor}
+          onChangeText={(t) => aoMudar(mascaraHora(t))}
+          keyboardType="number-pad"
+          maxLength={5}
+          placeholder="23:00"
+          placeholderTextColor={cores.cinza}
+          style={[estilos.campo, { flex: 1, minWidth: 0, textAlign: 'center', fontWeight: '700', paddingHorizontal: 4 }]}
+        />
+        {botao('+15', 15)}
+      </View>
+    </View>
+  );
+}
+
+/** Campo de data com máscara: digite só os números (28101992 → 28/10/1992). */
+export function CampoData({ rotulo, valor, aoMudar }: { rotulo: string; valor: string; aoMudar: (v: string) => void }) {
+  return <Campo rotulo={rotulo} value={valor} onChangeText={(t) => aoMudar(mascaraData(t))} placeholder="dd/mm/aaaa" keyboardType="number-pad" maxLength={10} />;
+}

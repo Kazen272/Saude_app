@@ -5,6 +5,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, T
 import { Botao, Campo, LinhaCampos, Cartao, Nota, estilos } from '@/components/ui';
 import { NOMES_DIAS, descrever, validar, type Lembrete, type TipoLembrete } from '@/lib/lembretes-regras';
 import { apagarLembrete, listarLembretes, salvarLembrete, sincronizarAgendamentos } from '@/lib/lembretes';
+import { mascaraHora } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
 const NOVO: Lembrete = {
@@ -175,7 +176,7 @@ export default function EditarLembrete() {
               </View>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
                 <View style={{ flex: 1 }}>
-                  <Campo rotulo="Adicionar horário" value={novoHorario} onChangeText={setNovoHorario} placeholder="08:30" keyboardType="numbers-and-punctuation" onSubmitEditing={adicionarHorario} />
+                  <Campo rotulo="Adicionar horário" value={novoHorario} onChangeText={(t) => setNovoHorario(mascaraHora(t))} placeholder="08:30" keyboardType="number-pad" onSubmitEditing={adicionarHorario} />
                 </View>
                 <View style={{ width: 100 }}>
                   <Botao titulo="Adicionar" variante="suave" aoTocar={adicionarHorario} />
@@ -196,8 +197,8 @@ export default function EditarLembrete() {
                 ))}
               </View>
               <LinhaCampos>
-                <Campo rotulo="Começa às" value={l.inicio ?? ''} onChangeText={(t) => mudar({ inicio: t })} placeholder="09:00" keyboardType="numbers-and-punctuation" />
-                <Campo rotulo="Termina às" value={l.fim ?? ''} onChangeText={(t) => mudar({ fim: t })} placeholder="21:00" keyboardType="numbers-and-punctuation" />
+                <Campo rotulo="Começa às" value={l.inicio ?? ''} onChangeText={(t) => mudar({ inicio: mascaraHora(t) })} placeholder="09:00" keyboardType="number-pad" />
+                <Campo rotulo="Termina às" value={l.fim ?? ''} onChangeText={(t) => mudar({ fim: mascaraHora(t) })} placeholder="21:00" keyboardType="number-pad" />
               </LinhaCampos>
             </>
           )}

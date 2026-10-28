@@ -58,4 +58,10 @@ preciso gerar um APK novo.
 - [x] Lembretes com recorrência: horários fixos ou a cada X tempo, por dia da semana; abrem a tela certa
 - [x] Relatório de domingo: semana × semana anterior, o que melhorou e piorou
 - [x] Exames de sangue: laudo anexado, valores digitados, faixa do laboratório ou referência por idade e sexo, histórico por marcador
+- [x] Usabilidade: primeiro acesso guiado, peso digitável, registro em dias passados, histórico com apagar/corrigir, check-in compacto, desfazer água, seletores de data e hora
+- [x] Informações: balanço parcial + ontem completo, projeção em faixa, frescor dos dados do relógio, proteína e macros, aviso de ritmo, cintura ÷ altura, tendências de 8 semanas (treinos, passos, FC de repouso)
 - [ ] Leitura automática do laudo (no celular ou por IA)
+
+## Configuração do Supabase (uma vez)
+
+Para o link de confirmação do e-mail abrir o app: **Authentication → URL Configuration → Redirect URLs**, adicionar `saudeapp://**`.

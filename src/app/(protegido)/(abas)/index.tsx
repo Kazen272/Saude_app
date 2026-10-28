@@ -1,4 +1,4 @@
-import { Link, useFocusEffect } from 'expo-router';
+import { Link, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,9 +7,12 @@ import { CartaoCheckin, CartaoSono } from '@/components/bemestar';
 import { Botao, Cabecalho, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
 import { alertaDeficitAgressivo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
 import { carregarCheckins, carregarNoites, salvarCheckin } from '@/lib/bemestar-dados';
-import { carregarResumoDoDia, registrarAgua, type ResumoDoDia } from '@/lib/dados';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { LIMITE_RITMO_PCT } from '@/lib/calculos';
+import { apagarAgua, carregarResumoDoDia, registrarAgua, type ResumoDoDia } from '@/lib/dados';
 import { dataPorExtenso, decimal, diaCurto, diaLocal, milhar } from '@/lib/datas';
-import { nomeDoApp, sincronizar, sincronizarSeLiberado } from '@/lib/healthconnect';
+import { lerEstado, nomeDoApp, sincronizar, sincronizarSeLiberado, type EstadoSync } from '@/lib/healthconnect';
 import { cores } from '@/lib/tema';
 
 export default function Hoje() {
@@ -19,14 +22,22 @@ export default function Hoje() {
   const [salvandoAgua, setSalvandoAgua] = useState(false);
   const [noites, setNoites] = useState<Noite[]>([]);
   const [checkins, setCheckins] = useState<CheckIn[]>([]);
+  const [ultimaAgua, setUltimaAgua] = useState<{ id: number; ml: number } | null>(null);
+  const [sync, setSync] = useState<EstadoSync | null>(null);
 
   const carregar = useCallback(async () => {
     try {
       setErro(null);
-      const [r, n, c] = await Promise.all([carregarResumoDoDia(), carregarNoites(7), carregarCheckins(3)]);
+      const [r, n, c, e] = await Promise.all([carregarResumoDoDia(), carregarNoites(7), carregarCheckins(3), lerEstado()]);
       setResumo(r);
       setNoites(n);
       setCheckins(c);
+      setSync(e);
+      // Primeiro acesso: sem perfil, vai para o passo a passo (uma vez só).
+      if (!r.perfilCompleto) {
+        const visto = await AsyncStorage.getItem('boas-vindas:visto').catch(() => '1');
+        if (!visto) router.replace('/boas-vindas');
+      }
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao carregar os dados.');
     }
@@ -54,12 +65,26 @@ export default function Hoje() {
     setSalvandoAgua(true);
     setResumo({ ...resumo, aguaMl: resumo.aguaMl + 250 }); // resposta imediata na tela
     try {
-      await registrarAgua(250);
+      const id = await registrarAgua(250);
+      setUltimaAgua(id != null ? { id, ml: 250 } : null);
     } catch {
       setResumo((r) => (r ? { ...r, aguaMl: r.aguaMl - 250 } : r));
       setErro('Não foi possível salvar a água. Tente de novo.');
     } finally {
       setSalvandoAgua(false);
+    }
+  }
+
+  async function desfazerAgua() {
+    if (!ultimaAgua || !resumo) return;
+    const { id, ml } = ultimaAgua;
+    setUltimaAgua(null);
+    setResumo({ ...resumo, aguaMl: Math.max(0, resumo.aguaMl - ml) });
+    try {
+      await apagarAgua(id);
+    } catch {
+      setErro('Não foi possível desfazer.');
+      carregar();
     }
   }
 
@@ -105,6 +130,7 @@ export default function Hoje() {
         )}
 
         {resumo && <CartaoBalanco resumo={resumo} />}
+        {resumo && <CartaoProteina resumo={resumo} />}
 
         {resumo && (
           <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -116,6 +142,11 @@ export default function Hoje() {
               </Text>
               <Barra fracao={resumo.aguaMl / resumo.perfil.water_goal_ml} cor={cores.azul} trilho={cores.azulClaro} />
               <Botao titulo="+ 250 ml" variante="agua" aoTocar={adicionarAgua} desativado={salvandoAgua} rotuloAcessivel="Adicionar 250 ml de água" />
+              {ultimaAgua && (
+                <Pressable accessibilityRole="button" onPress={desfazerAgua} style={{ minHeight: 32, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: cores.azulEscuro }}>Desfazer</Text>
+                </Pressable>
+              )}
             </Cartao>
             <Cartao estilo={{ flex: 1 }}>
               <Rotulo>Peso</Rotulo>
@@ -142,7 +173,7 @@ export default function Hoje() {
         {resumo && <CartaoCheckin checkin={checkinHoje} alerta={alertaDeficitAgressivo(checkins)} aoMudar={mudarCheckin} />}
         {resumo && <CartaoSono ultima={noites.at(-1) ?? null} resumo={resumirSono(noites)} />}
         {resumo && <CartaoTreino resumo={resumo} />}
-        {resumo && <CartaoRelogio resumo={resumo} />}
+        {resumo && <CartaoRelogio resumo={resumo} sync={sync} />}
         {resumo && <CartaoProjecao resumo={resumo} />}
       </ScrollView>
     </SafeAreaView>
@@ -164,7 +195,12 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
   return (
     <View style={{ backgroundColor: cores.tinta, borderRadius: 22, padding: 20, gap: 16 }}>
       <View style={{ gap: 4 }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Balanço do dia</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Balanço de hoje até {resumo.horaParcial}</Text>
+          <View style={{ backgroundColor: cores.escuroTrilho, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: cores.escuroSuave }}>parcial</Text>
+          </View>
+        </View>
         <Text style={{ fontSize: 36, fontWeight: '800', color: '#FFFFFF', fontVariant: ['tabular-nums'] }}>
           {deficitHoje == null ? '—' : `${deficitHoje >= 0 ? '−' : '+'}${milhar(Math.abs(deficitHoje))} kcal`}
         </Text>
@@ -174,8 +210,8 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
               ? 'aguardando a dieta (FatSecret via Health Connect)'
               : 'complete o perfil e registre o peso'
             : deficitHoje >= 0
-              ? `déficit até agora · ≈ ${Math.round((deficitHoje / 7700) * 1000)} g de gordura`
-              : 'superávit até agora'}
+              ? 'déficit até agora · o dia ainda não terminou'
+              : 'superávit até agora · o dia ainda não terminou'}
         </Text>
       </View>
       <View style={{ gap: 10 }}>
@@ -187,7 +223,51 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
           cor={cores.verdeVivo}
         />
       </View>
+      <View style={{ borderTopWidth: 1, borderTopColor: cores.escuroTrilho, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+        <Text style={{ fontSize: 13, color: cores.escuroSuave, flexShrink: 1 }}>Ontem (dia completo)</Text>
+        <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF', fontVariant: ['tabular-nums'] }}>
+          {resumo.ontem.deficit == null
+            ? '—'
+            : `${resumo.ontem.deficit >= 0 ? 'déficit de' : 'superávit de'} ${milhar(Math.abs(resumo.ontem.deficit))} kcal`}
+        </Text>
+      </View>
     </View>
+  );
+}
+
+function CartaoProteina({ resumo }: { resumo: ResumoDoDia }) {
+  const m = resumo.macros;
+  const meta = resumo.metaProteina;
+  if (!m || m.proteina == null) {
+    return (
+      <Cartao estilo={{ gap: 4 }}>
+        <Rotulo>Proteína</Rotulo>
+        <Nota>
+          {meta
+            ? `Sua meta em déficit: ${meta.min} a ${meta.max} g por dia. O consumo aparece aqui quando a dieta chegar do FatSecret.`
+            : 'A meta de proteína aparece depois da primeira pesagem.'}
+        </Nota>
+      </Cartao>
+    );
+  }
+  const atingiu = meta ? m.proteina >= meta.min : false;
+  return (
+    <Cartao estilo={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <Rotulo>Proteína</Rotulo>
+        <Text style={{ fontSize: 13, color: cores.cinza }}>{meta ? `meta ${meta.min}–${meta.max} g` : ''}</Text>
+      </View>
+      <Text style={estilos.numero}>
+        {Math.round(m.proteina)} g
+        {meta && <Text style={estilos.unidade}> {atingiu ? '· meta atingida' : `· faltam ${meta.min - Math.round(m.proteina)} g`}</Text>}
+      </Text>
+      {meta && <Barra fracao={m.proteina / meta.min} cor={atingiu ? cores.verde : cores.laranja} trilho={cores.linhaSuave} />}
+      <Nota>
+        {[m.carbo != null ? `carboidrato ${Math.round(m.carbo)} g` : null, m.gordura != null ? `gordura ${Math.round(m.gordura)} g` : null]
+          .filter(Boolean)
+          .join(' · ') || 'Em déficit, proteína suficiente ajuda a perder gordura e não músculo.'}
+      </Nota>
+    </Cartao>
   );
 }
 
@@ -232,12 +312,29 @@ function CartaoTreino({ resumo }: { resumo: ResumoDoDia }) {
   );
 }
 
-function CartaoRelogio({ resumo }: { resumo: ResumoDoDia }) {
+function haQuanto(iso: string): string {
+  const min = Math.round((Date.now() - Date.parse(iso)) / 60000);
+  if (min < 2) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60);
+  return h < 24 ? `há ${h} h` : `há ${Math.round(h / 24)} d`;
+}
+
+function CartaoRelogio({ resumo, sync }: { resumo: ResumoDoDia; sync: EstadoSync | null }) {
   const a = resumo.atividade;
   const sono = a?.sleep_minutes != null ? `${Math.floor(a.sleep_minutes / 60)}h${String(a.sleep_minutes % 60).padStart(2, '0')}` : '—';
+  const ultimo = sync?.ultimoDadoRelogio;
+  const atrasado = ultimo ? Date.now() - Date.parse(ultimo) > 3 * 3600_000 : false;
   return (
     <Cartao>
-      <Rotulo>Relógio</Rotulo>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <Rotulo>Relógio</Rotulo>
+        {ultimo && (
+          <Text style={{ fontSize: 12, fontWeight: atrasado ? '700' : '400', color: atrasado ? cores.laranja : cores.cinza, flexShrink: 1, textAlign: 'right' }}>
+            último dado {haQuanto(ultimo)}
+          </Text>
+        )}
+      </View>
       {a ? (
         <View style={{ flexDirection: 'row' }}>
           <Indicador valor={a.steps != null ? milhar(a.steps) : '—'} legenda="passos" />
@@ -247,6 +344,7 @@ function CartaoRelogio({ resumo }: { resumo: ResumoDoDia }) {
       ) : (
         <Nota>Sem dados do relógio hoje. Conecte o Health Connect na aba Mais e sincronize o relógio pelo app dele.</Nota>
       )}
+      {atrasado && <Nota>Os números podem estar desatualizados: abra o app do relógio para ele enviar os dados ao Health Connect.</Nota>}
     </Cartao>
   );
 }
@@ -271,16 +369,21 @@ function CartaoProjecao({ resumo }: { resumo: ResumoDoDia }) {
     titulo = 'Sem déficit nos últimos dias';
     detalhe = 'No ritmo atual, o peso não deve cair.';
   } else if (p?.estado === 'no_caminho') {
-    const semanas = Math.max(1, Math.round(p.dias / 7));
-    titulo = `No ritmo atual, ${decimal(resumo.perfil.goal_weight_kg ?? 0, 0)} kg em ~${semanas} semana${semanas > 1 ? 's' : ''}`;
-    detalhe = `previsão: ${diaCurto(p.data)} · ${decimal(p.kgPorSemana, 2)} kg por semana`;
+    titulo = `${decimal(resumo.perfil.goal_weight_kg ?? 0, 0)} kg entre ${diaCurto(p.dataCedo)} e ${diaCurto(p.dataTarde)}`;
+    detalhe = `no ritmo médio, por volta de ${diaCurto(p.data)} · ${decimal(p.kgPorSemana, 2)} kg por semana pelas calorias`;
   }
+  const rapido = resumo.ritmo && resumo.ritmo.pctPorSemana > LIMITE_RITMO_PCT;
   return (
     <Link href="/progresso" asChild>
       <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { backgroundColor: cores.verdeClaro, gap: 2 }])}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verdeEscuro }}>Projeção</Text>
         <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>{titulo}</Text>
         <Text style={{ fontSize: 13, color: cores.tintaSuave }}>{detalhe}</Text>
+        {rapido && (
+          <Text style={{ fontSize: 13, fontWeight: '700', color: cores.laranja, marginTop: 4 }}>
+            Perdendo {decimal(resumo.ritmo!.pctPorSemana)}% do peso por semana: acima de 1% costuma levar massa magra junto.
+          </Text>
+        )}
       </Pressable>
     </Link>
   );

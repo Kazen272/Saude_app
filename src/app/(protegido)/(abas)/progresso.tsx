@@ -4,18 +4,20 @@ import { Pressable, RefreshControl, ScrollView, Text, View, StyleSheet } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradeCheckins, GraficoSono } from '@/components/bemestar';
-import { GraficoDeficit, GraficoPeso } from '@/components/graficos';
+import { GraficoDeficit, GraficoPeso, GraficoSemanas } from '@/components/graficos';
 import { Cabecalho, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { LIMITE_RITMO_PCT } from '@/lib/calculos';
 import { formatarDuracao, mediaCampo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
 import { carregarCheckins, carregarNoites } from '@/lib/bemestar-dados';
 import { carregarProgresso, type Progresso as DadosProgresso } from '@/lib/dados';
 import { decimal, diaCurto, diaLocal, milhar } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
+// O período vale só para o gráfico de peso; os outros cartões dizem o próprio período.
 const PERIODOS = [
-  { dias: 7, nome: 'Semana', sobre: 'Últimos 7 dias' },
-  { dias: 30, nome: 'Mês', sobre: 'Últimos 30 dias' },
-  { dias: 56, nome: '8 semanas', sobre: 'Últimas 8 semanas' },
+  { dias: 7, nome: '7 dias' },
+  { dias: 30, nome: '30 dias' },
+  { dias: 56, nome: '8 semanas' },
 ];
 
 export default function Progresso() {
@@ -45,7 +47,6 @@ export default function Progresso() {
   );
 
   const hoje = diaLocal();
-  const atual = PERIODOS.find((p) => p.dias === periodo) ?? PERIODOS[2];
   const primeira = dados?.medias[0];
   const ultima = dados?.medias.at(-1);
   const variacao = primeira && ultima && primeira.dia !== ultima.dia ? ultima.pesoKg - primeira.pesoKg : null;
@@ -66,7 +67,7 @@ export default function Progresso() {
           />
         }
       >
-        <Cabecalho sobre={atual.sobre} titulo="Progresso" />
+        <Cabecalho sobre="Peso, energia, sono e hábitos" titulo="Progresso" />
 
         <Link href="/relatorio" asChild>
           <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { backgroundColor: cores.tinta, flexDirection: 'row', alignItems: 'center' }])}>
@@ -77,23 +78,6 @@ export default function Progresso() {
             <Text style={{ fontSize: 22, color: '#FFFFFF' }}>›</Text>
           </Pressable>
         </Link>
-
-        <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, backgroundColor: '#E7EAE4', borderRadius: 12, padding: 4 }}>
-          {PERIODOS.map((p) => {
-            const ativo = p.dias === periodo;
-            return (
-              <Pressable
-                key={p.dias}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: ativo }}
-                onPress={() => setPeriodo(p.dias)}
-                style={{ flex: 1, height: 40, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? cores.cartao : 'transparent' }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: ativo ? '700' : '600', color: ativo ? cores.tinta : cores.cinza }}>{p.nome}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
 
         {erro && (
           <Cartao estilo={{ backgroundColor: cores.laranjaClaro }}>
@@ -116,6 +100,22 @@ export default function Progresso() {
               {dados?.perfil.goal_weight_kg != null ? `meta: ${decimal(dados.perfil.goal_weight_kg, dados.perfil.goal_weight_kg % 1 ? 1 : 0)} kg` : 'meta não definida'}
             </Text>
           </View>
+          <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, backgroundColor: '#E7EAE4', borderRadius: 12, padding: 4 }}>
+            {PERIODOS.map((p) => {
+              const ativo = p.dias === periodo;
+              return (
+                <Pressable
+                  key={p.dias}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: ativo }}
+                  onPress={() => setPeriodo(p.dias)}
+                  style={{ flex: 1, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? cores.cartao : 'transparent' }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: ativo ? '700' : '600', color: ativo ? cores.tinta : cores.cinza }}>{p.nome}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
           {dados && (
             <GraficoPeso
               medias={dados.medias}
@@ -127,13 +127,21 @@ export default function Progresso() {
             />
           )}
           {dados && <TextoProjecao dados={dados} />}
+          {dados?.ritmo && (
+            <Text style={{ fontSize: 13, fontWeight: dados.ritmo.pctPorSemana > LIMITE_RITMO_PCT ? '700' : '400', color: dados.ritmo.pctPorSemana > LIMITE_RITMO_PCT ? cores.laranja : cores.cinza }}>
+              {dados.ritmo.kgPorSemana > 0
+                ? `Ritmo real nas últimas 2 semanas: −${decimal(dados.ritmo.kgPorSemana, 2)} kg por semana (${decimal(dados.ritmo.pctPorSemana)}% do peso).`
+                : `Peso estável ou subindo nas últimas 2 semanas (${dados.ritmo.kgPorSemana === 0 ? '0' : '+' + decimal(Math.abs(dados.ritmo.kgPorSemana), 2)} kg por semana).`}
+              {dados.ritmo.pctPorSemana > LIMITE_RITMO_PCT ? ' Acima de 1% por semana costuma levar massa magra junto: vale reduzir o déficit.' : ''}
+            </Text>
+          )}
         </Cartao>
 
         {/* Déficit */}
         <Cartao estilo={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <View style={{ gap: 2 }}>
-              <Rotulo>Déficit dos últimos 7 dias</Rotulo>
+              <Rotulo>Déficit · 7 dias completos</Rotulo>
               <Text style={{ fontSize: 28, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>
                 {dados?.semana.deficitTotal == null ? '—' : `${milhar(dados.semana.deficitTotal)} kcal`}
               </Text>
@@ -147,6 +155,9 @@ export default function Progresso() {
 
         {/* Resumo da semana */}
         <Cartao estilo={{ gap: 0, paddingVertical: 4 }}>
+          <View style={{ paddingTop: 12, paddingBottom: 2 }}>
+            <Rotulo>Últimos 7 dias completos (até ontem)</Rotulo>
+          </View>
           <LinhaResumo titulo="Gasto calórico da semana" valor={dados?.semana.gastoTotal != null ? `${milhar(dados.semana.gastoTotal)} kcal` : '—'} />
           <LinhaResumo
             titulo="Consumo da semana"
@@ -154,7 +165,12 @@ export default function Progresso() {
             detalhe={dados && dados.semana.diasComDieta > 0 && dados.semana.diasComDieta < 7 ? `${dados.semana.diasComDieta} de 7 dias com dieta` : undefined}
           />
           <LinhaResumo
-            titulo="Treinos (Hevy)"
+            titulo="Proteína (média/dia)"
+            valor={dados?.proteinaMediaSemana != null ? `${dados.proteinaMediaSemana} g` : '—'}
+            detalhe={dados?.metaProteina ? `meta ${dados.metaProteina.min}–${dados.metaProteina.max} g` : undefined}
+          />
+          <LinhaResumo
+            titulo="Treinos"
             valor={dados ? `${dados.treinosSemana.quantidade}${dados.treinosSemana.kcal ? ` · ${milhar(dados.treinosSemana.kcal)} kcal` : ''}` : '—'}
           />
           <LinhaResumo titulo="Água (média/dia)" valor={dados ? `${decimal(dados.aguaMediaMl / 1000)} L` : '—'} ultima />
@@ -187,6 +203,53 @@ export default function Progresso() {
           <GradeCheckins checkins={checkins} />
         </Cartao>
 
+        {/* Medidas */}
+        <CartaoMedidas dados={dados} />
+
+        {/* Tendências de 8 semanas */}
+        <Cartao estilo={{ gap: 14 }}>
+          <View style={{ gap: 2 }}>
+            <Rotulo>Tendências · 8 semanas</Rotulo>
+            <Nota>Médias por semana (segunda a domingo). A semana atual ainda não terminou.</Nota>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tinta }}>Treinos por semana</Text>
+            <GraficoSemanas
+              semanas={(dados?.tendencias ?? []).map((t) => ({ semana: t.semana, valor: t.treinos }))}
+              formatar={(v) => String(v)}
+              meta={{ valor: 3, texto: 'meta 3' }}
+              rotulo="Treinos por semana"
+              vazio="Os treinos do Hevy e do relógio aparecem aqui."
+            />
+            {dados && dados.tendencias.some((t) => t.treinos > 0) && (
+              <Nota>
+                Constância: {dados.tendencias.slice(0, -1).filter((t) => t.treinos >= 3).length} das últimas 7 semanas completas com 3 treinos ou mais.
+              </Nota>
+            )}
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tinta }}>Passos por dia</Text>
+            <GraficoSemanas
+              semanas={(dados?.tendencias ?? []).map((t) => ({ semana: t.semana, valor: t.passos }))}
+              formatar={(v) => (v >= 1000 ? `${decimal(v / 1000)} mil` : String(v))}
+              cor={cores.azul}
+              rotulo="Média de passos por dia, por semana"
+              vazio="Os passos do relógio aparecem aqui."
+            />
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tinta }}>Frequência cardíaca de repouso</Text>
+            <GraficoSemanas
+              semanas={(dados?.tendencias ?? []).map((t) => ({ semana: t.semana, valor: t.fcRepouso }))}
+              formatar={(v) => `${v}`}
+              cor={cores.laranja}
+              rotulo="Frequência cardíaca de repouso média, por semana"
+              vazio="A frequência de repouso do relógio aparece aqui."
+            />
+            <Nota>Quanto mais baixa, em geral, melhor o condicionamento. Picos podem indicar cansaço, estresse ou início de gripe.</Nota>
+          </View>
+        </Cartao>
+
         {/* Previsto × real */}
         <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 18, padding: 16, gap: 4 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: '#8A4A14' }}>Previsto × real</Text>
@@ -200,10 +263,59 @@ export default function Progresso() {
 function TextoProjecao({ dados }: { dados: DadosProgresso }) {
   const p = dados.projecao;
   let texto = 'A projeção aparece com meta definida, pesagens e alguns dias de dieta.';
-  if (p?.estado === 'no_caminho') texto = `No ritmo atual (${milhar(dados.deficitMedio ?? 0)} kcal/dia de déficit), a meta chega em ${diaCurto(p.data)}.`;
+  if (p?.estado === 'no_caminho')
+    texto = `Com ${milhar(dados.deficitMedio ?? 0)} kcal/dia de déficit em média, a meta chega entre ${diaCurto(p.dataCedo)} e ${diaCurto(p.dataTarde)} (mais provável por volta de ${diaCurto(p.data)}).`;
   if (p?.estado === 'sem_deficit') texto = 'Sem déficit nos últimos 14 dias: no ritmo atual, o peso não deve cair.';
-  if (p?.estado === 'atingida') texto = 'Meta atingida. Defina uma nova na aba Fontes.';
+  if (p?.estado === 'atingida') texto = 'Meta atingida. Defina uma nova no perfil, na aba Mais.';
   return <Nota>{texto}</Nota>;
+}
+
+const NIVEL_CINTURA = {
+  adequado: { texto: 'adequada', cor: cores.verdeEscuro, fundo: cores.verdeClaro },
+  atencao: { texto: 'atenção', cor: '#8A4A14', fundo: cores.laranjaClaro },
+  alto: { texto: 'alta', cor: '#8A1F1F', fundo: '#F6DCDC' },
+};
+
+function CartaoMedidas({ dados }: { dados: DadosProgresso | null }) {
+  const c = dados?.cintura;
+  if (!c) {
+    return (
+      <Cartao estilo={{ gap: 4 }}>
+        <Rotulo>Cintura</Rotulo>
+        <Nota>Registre a cintura 1 vez por semana na aba Registrar. Ela mostra a perda de gordura abdominal melhor que o peso.</Nota>
+      </Cartao>
+    );
+  }
+  const variacao = c.atual - c.inicial;
+  const n = c.relacao ? NIVEL_CINTURA[c.relacao.nivel] : null;
+  return (
+    <Cartao estilo={{ gap: 10 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
+        <View style={{ gap: 2 }}>
+          <Rotulo>Cintura</Rotulo>
+          <Text style={{ fontSize: 28, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>{decimal(c.atual, c.atual % 1 ? 1 : 0)} cm</Text>
+        </View>
+        <Text style={{ fontSize: 13, color: cores.cinza, textAlign: 'right', flexShrink: 1 }}>
+          {c.dia === c.diaInicial
+            ? `medida em ${diaCurto(c.dia)}`
+            : Math.abs(variacao) < 0.05
+              ? `igual desde ${diaCurto(c.diaInicial)}`
+              : `${variacao < 0 ? '−' : '+'}${decimal(Math.abs(variacao), Math.abs(variacao) % 1 ? 1 : 0)} cm desde ${diaCurto(c.diaInicial)}`}
+        </Text>
+      </View>
+      {c.relacao && n ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Text style={{ fontSize: 14, color: cores.tintaSuave }}>Cintura ÷ altura: {decimal(c.relacao.valor, 2)}</Text>
+          <View style={{ backgroundColor: n.fundo, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: n.cor }}>{n.texto}</Text>
+          </View>
+        </View>
+      ) : (
+        <Nota>Preencha a altura no perfil para ver a relação cintura ÷ altura.</Nota>
+      )}
+      <Nota>Abaixo de 0,5 é considerado adequado; de 0,5 a 0,6 pede atenção; acima de 0,6 indica mais gordura abdominal. É uma referência geral, não um diagnóstico.</Nota>
+    </Cartao>
+  );
 }
 
 function textoPrevistoReal(dados: DadosProgresso | null): string {

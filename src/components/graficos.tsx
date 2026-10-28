@@ -181,9 +181,18 @@ export function GraficoDeficit({ dias, hoje }: { dias: { dia: string; deficit: n
   const topo = 18;
   const base = 22;
   const area = altura - topo - base;
-  const negativos = dias.some((d) => (d.deficit ?? 0) < 0);
-  const zeroY = topo + area * (negativos ? 0.72 : 1);
-  const escala = (negativos ? area * 0.72 : area) / maxAbs;
+  // Espaço acima e abaixo do zero proporcional aos maiores valores de cada lado,
+  // com folga para os rótulos; a mesma escala vale para os dois lados.
+  const maxPos = Math.max(0, ...dias.map((d) => d.deficit ?? 0));
+  const maxNeg = Math.max(0, ...dias.map((d) => -(d.deficit ?? 0)));
+  const rotulo = 14;
+  const parteNeg = maxNeg > 0 ? Math.min(0.5, Math.max(0.22, maxNeg / (maxPos + maxNeg))) : 0;
+  const zeroY = topo + area * (1 - parteNeg);
+  const escala = Math.min(
+    maxPos > 0 ? (area * (1 - parteNeg)) / maxPos : Infinity,
+    maxNeg > 0 ? (area * parteNeg - rotulo) / maxNeg : Infinity,
+    area / Math.max(maxAbs, 1),
+  );
   const coluna = w / dias.length;
   const barra = Math.min(28, coluna * 0.55);
 
@@ -228,7 +237,8 @@ export function GraficoDeficit({ dias, hoje }: { dias: { dia: string; deficit: n
                 />
                 <SvgTexto
                   x={cx}
-                  y={positivo ? zeroY - h - 5 : zeroY + h + 12}
+                  // abaixo do zero, o rótulo não pode invadir a linha dos dias da semana
+                  y={positivo ? zeroY - h - 5 : Math.min(zeroY + h + 12, altura - base - 2)}
                   fontSize={10.5}
                   fontWeight={positivo ? '400' : '700'}
                   fill={positivo ? cores.tintaSuave : cores.laranja}
@@ -245,6 +255,84 @@ export function GraficoDeficit({ dias, hoje }: { dias: { dia: string; deficit: n
           <Line x1={0} x2={w} y1={zeroY} y2={zeroY} stroke="#9AA39D" />
         </Svg>
       )}
+    </View>
+  );
+}
+
+/**
+ * Barras por semana (8 semanas, da mais antiga à atual). Semanas sem dado ficam
+ * como um traço. A semana atual fica mais clara: ainda não terminou.
+ */
+export function GraficoSemanas({
+  semanas,
+  formatar,
+  cor = cores.verde,
+  meta,
+  rotulo,
+  vazio,
+}: {
+  semanas: { semana: string; valor: number | null }[];
+  formatar: (v: number) => string;
+  cor?: string;
+  meta?: { valor: number; texto: string };
+  rotulo: string;
+  vazio: string;
+}) {
+  const largura = useLarguraDoCartao();
+  const altura = 132;
+  if (semanas.every((s) => s.valor == null || s.valor === 0)) {
+    return (
+      <View style={{ height: 72, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: cores.linha, alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+        <Text style={{ fontSize: 13, color: cores.cinza, textAlign: 'center' }}>{vazio}</Text>
+      </View>
+    );
+  }
+  const w = largura;
+  const topo = 18;
+  const base = 22;
+  const maximo = Math.max(...semanas.map((s) => s.valor ?? 0), meta?.valor ?? 0, 1);
+  const y = (v: number) => topo + (1 - v / maximo) * (altura - topo - base);
+  const coluna = w / semanas.length;
+  const barra = Math.min(26, coluna * 0.6);
+  const descricao = semanas.map((s) => `semana de ${diaCurto(s.semana)}: ${s.valor == null ? 'sem dados' : formatar(s.valor)}`).join(', ');
+  return (
+    <View accessible accessibilityRole="image" accessibilityLabel={`${rotulo}. ${descricao}`}>
+      <Svg width={w} height={altura}>
+        {meta && (
+          <>
+            <Line x1={0} x2={w} y1={y(meta.valor)} y2={y(meta.valor)} stroke={cores.laranja} strokeDasharray="2 4" strokeWidth={1.25} />
+            <SvgTexto x={w} y={y(meta.valor) - 4} fontSize={10.5} fill={cores.laranja} textAnchor="end" fontWeight="700">
+              {meta.texto}
+            </SvgTexto>
+          </>
+        )}
+        {semanas.map((s, i) => {
+          const cx = coluna * i + coluna / 2;
+          const atual = i === semanas.length - 1;
+          const rotuloX = atual ? 'atual' : diaCurto(s.semana);
+          return (
+            <G key={s.semana}>
+              {s.valor != null && s.valor > 0 ? (
+                <>
+                  <Rect x={cx - barra / 2} y={y(s.valor)} width={barra} height={y(0) - y(s.valor)} rx={4} fill={cor} fillOpacity={atual ? 0.45 : 1} />
+                  {(i % 2 === 1 || atual) && (
+                    <SvgTexto x={cx} y={y(s.valor) - 4} fontSize={10} fill={cores.tintaSuave} textAnchor="middle">
+                      {formatar(s.valor)}
+                    </SvgTexto>
+                  )}
+                </>
+              ) : (
+                <Rect x={cx - barra / 2} y={y(0) - 3} width={barra} height={3} rx={1.5} fill={cores.linha} />
+              )}
+              {(i % 2 === 1 || atual) && (
+                <SvgTexto x={cx} y={altura - 4} fontSize={10.5} fill={atual ? cores.tinta : cores.cinza} fontWeight={atual ? '700' : '400'} textAnchor="middle">
+                  {rotuloX}
+                </SvgTexto>
+              )}
+            </G>
+          );
+        })}
+      </Svg>
     </View>
   );
 }

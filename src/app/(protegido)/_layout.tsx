@@ -47,6 +47,8 @@ export default function LayoutProtegido() {
       <Stack.Screen name="exames/[id]" options={{ title: 'Exame' }} />
       <Stack.Screen name="exames/marcador/[codigo]" options={{ title: 'Histórico' }} />
       <Stack.Screen name="sono" options={{ title: 'Sono' }} />
+      <Stack.Screen name="historico" options={{ title: 'Revisar dia' }} />
+      <Stack.Screen name="boas-vindas" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>
   );
 }

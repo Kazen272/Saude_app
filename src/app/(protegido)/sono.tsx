@@ -3,10 +3,10 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { GraficoSono } from '@/components/bemestar';
-import { Botao, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { Botao, Cartao, Nota, Rotulo, SeletorDia, SeletorHora, estilos } from '@/components/ui';
 import { duracaoSono, formatarDuracao, formatarHora, lerHora, resumirSono, type Noite } from '@/lib/bemestar';
 import { carregarNoites, registrarSono } from '@/lib/bemestar-dados';
-import { diaCurto, diaLocal, somarDias } from '@/lib/datas';
+import { diaCurto, diaLocal, nomeDoDia, somarDias } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
 export default function Sono() {
@@ -46,7 +46,7 @@ export default function Sono() {
     setSalvando(true);
     try {
       await registrarSono({ dia, deitouMin, acordouMin, qualidade });
-      setMensagem({ tipo: 'ok', texto: 'Noite salva.' });
+      setMensagem({ tipo: 'ok', texto: `Noite de ${nomeDoDia(dia).toLowerCase()} salva.` });
       await carregar();
     } catch (e) {
       setMensagem({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Erro ao salvar.' });
@@ -63,34 +63,13 @@ export default function Sono() {
       <ScrollView contentContainerStyle={[estilos.conteudo, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
         <Cartao estilo={{ gap: 12 }}>
           <Rotulo>Registrar noite</Rotulo>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {[
-              { valor: hoje, nome: 'Esta noite (acordei hoje)' },
-              { valor: somarDias(hoje, -1), nome: 'Noite anterior' },
-            ].map((o) => (
-              <Pressable
-                key={o.valor}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: dia === o.valor }}
-                onPress={() => setDia(o.valor)}
-                style={{
-                  flex: 1,
-                  minHeight: 44,
-                  borderRadius: 12,
-                  padding: 8,
-                  justifyContent: 'center',
-                  backgroundColor: dia === o.valor ? cores.verde : cores.linhaSuave,
-                }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', textAlign: 'center', color: dia === o.valor ? '#FFFFFF' : cores.tintaSuave }}>{o.nome}</Text>
-              </Pressable>
-            ))}
+          <Text style={estilos.campoRotulo}>Dia em que acordou</Text>
+          <SeletorDia dia={dia} aoMudar={setDia} maxDias={30} />
+          <View style={{ gap: 10 }}>
+            <SeletorHora rotulo="Deitei às" valor={deitou} aoMudar={setDeitou} />
+            <SeletorHora rotulo="Acordei às" valor={acordou} aoMudar={setAcordou} />
           </View>
-          <LinhaCampos>
-            <Campo rotulo="Deitei às" value={deitou} onChangeText={setDeitou} placeholder="23:00" keyboardType="numbers-and-punctuation" />
-            <Campo rotulo="Acordei às" value={acordou} onChangeText={setAcordou} placeholder="07:00" keyboardType="numbers-and-punctuation" />
-          </LinhaCampos>
-          <Nota>{duracao != null ? `Total: ${formatarDuracao(duracao)}` : 'Use o formato 23:30.'}</Nota>
+          <Nota>{duracao != null ? `Total na cama: ${formatarDuracao(duracao)}` : 'Digite só os números: 2330 vira 23:30.'}</Nota>
           <View style={{ gap: 6 }}>
             <Text style={estilos.campoRotulo}>Como dormiu? (opcional)</Text>
             <View style={{ flexDirection: 'row', gap: 6 }}>

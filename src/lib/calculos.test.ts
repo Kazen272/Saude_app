@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  aguaSugeridaMl,
+  fracaoDoDia,
+  metaProteina,
+  relacaoCinturaAltura,
+  ritmoSemanal,
   ajusteDeGasto,
   deficit,
   gastoDiario,
@@ -45,6 +50,12 @@ describe('gastoDiario', () => {
   it('usa o total do relógio quando não há calorias ativas', () => {
     assert.deepEqual(gastoDiario({ tmb: 1832, kcalAtivas: null, kcalTotais: 2500, fatorAtividade: 1.2 }), { kcal: 2500, origem: 'relogio' });
     assert.equal(gastoDiario({ tmb: 1832, kcalAtivas: null, kcalTotais: 900, fatorAtividade: 1.2 }).origem, 'estimativa');
+  });
+  it('conta só a parte do dia que já passou', () => {
+    // meio-dia: metade do basal + o que o relógio mediu até agora
+    assert.equal(gastoDiario({ tmb: 1800, kcalAtivas: 200, fatorAtividade: 1.2, fracaoDoDia: 0.5 }).kcal, 1100);
+    assert.equal(gastoDiario({ tmb: 1800, kcalAtivas: null, fatorAtividade: 1.2, fracaoDoDia: 0.5 }).kcal, 1080);
+    assert.equal(fracaoDoDia(720), 0.5);
   });
   it('aplica o ajuste da recalibração', () => {
     assert.equal(gastoDiario({ tmb: 1832, kcalAtivas: 600, fatorAtividade: 1.2, ajusteKcal: -90 }).kcal, 2342);
@@ -89,6 +100,8 @@ describe('projetarMeta', () => {
       dias: 51,
       kgPorSemana: 0.47,
       data: '2026-12-18',
+      dataCedo: '2026-12-09',
+      dataTarde: '2026-12-30',
     });
   });
   it('avisa quando não há déficit', () => {
@@ -112,5 +125,28 @@ describe('ajusteDeGasto', () => {
   });
   it('limita o ajuste a 500 kcal/dia', () => {
     assert.equal(ajusteDeGasto({ deficitAcumuladoKcal: 30800, pesoInicialKg: 92, pesoFinalKg: 92, dias: 14 }), -500);
+  });
+});
+
+describe('ritmo, proteína, água e cintura', () => {
+  it('ritmo semanal pela média móvel', () => {
+    const r = ritmoSemanal([
+      { dia: '2026-10-14', pesoKg: 90 },
+      { dia: '2026-10-28', pesoKg: 88.6 },
+    ]);
+    assert.deepEqual(r, { kgPorSemana: 0.7, pctPorSemana: 0.8 });
+    assert.equal(ritmoSemanal([{ dia: '2026-10-25', pesoKg: 90 }, { dia: '2026-10-28', pesoKg: 89 }]), null);
+  });
+  it('proteína de 1,6 a 2,2 g/kg', () => {
+    assert.deepEqual(metaProteina(88.6), { min: 142, max: 195 });
+  });
+  it('água ~35 ml/kg em passos de 250 ml', () => {
+    assert.equal(aguaSugeridaMl(88.6), 3000);
+    assert.equal(aguaSugeridaMl(30), 1500);
+  });
+  it('cintura/altura', () => {
+    assert.deepEqual(relacaoCinturaAltura(96, 178), { valor: 0.54, nivel: 'atencao' });
+    assert.equal(relacaoCinturaAltura(85, 178).nivel, 'adequado');
+    assert.equal(relacaoCinturaAltura(110, 178).nivel, 'alto');
   });
 });

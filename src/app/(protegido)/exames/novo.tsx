@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { AvisoMedico, SeloNivel, carregarContexto } from '@/components/exames';
-import { Botao, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { Botao, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos, CampoData } from '@/components/ui';
 import { diaLocal } from '@/lib/datas';
 import { escolherLaudo, salvarExame, type ArquivoEscolhido, type Resultado } from '@/lib/exames';
 import { MARCADORES, classificar, type Contexto, type Marcador } from '@/lib/referencias';
@@ -31,6 +31,8 @@ function lerData(texto: string): string | null {
 
 const GRUPOS = [...new Set(MARCADORES.map((m) => m.grupo))];
 
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 export default function NovoExame() {
   const hoje = diaLocal();
   const [data, setData] = useState(`${hoje.slice(8)}/${hoje.slice(5, 7)}/${hoje.slice(0, 4)}`);
@@ -40,6 +42,7 @@ export default function NovoExame() {
   const [ctx, setCtx] = useState<Contexto>({ idade: null, sexo: null });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
 
   useEffect(() => {
     carregarContexto().then(setCtx).catch(() => {});
@@ -89,7 +92,7 @@ export default function NovoExame() {
       <ScrollView contentContainerStyle={[estilos.conteudo, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
         <Cartao estilo={{ gap: 12 }}>
           <LinhaCampos>
-            <Campo rotulo="Data da coleta" value={data} onChangeText={setData} placeholder="dd/mm/aaaa" keyboardType="numbers-and-punctuation" />
+            <CampoData rotulo="Data da coleta" valor={data} aoMudar={setData} />
             <Campo rotulo="Laboratório (opcional)" value={laboratorio} onChangeText={setLaboratorio} maxLength={120} />
           </LinhaCampos>
           <Pressable
@@ -105,14 +108,26 @@ export default function NovoExame() {
 
         <Nota>Digite só os exames que aparecem no seu laudo, na mesma unidade indicada. Se o laudo trouxer a faixa de referência, toque em "faixa do laboratório" e informe: ela passa a valer no lugar da padrão.</Nota>
 
-        {GRUPOS.map((g) => (
-          <Cartao key={g} estilo={{ gap: 4 }}>
-            <Rotulo>{g}</Rotulo>
-            {MARCADORES.filter((m) => m.grupo === g).map((m) => (
-              <LinhaMarcador key={m.codigo} m={m} e={entrada(m.codigo)} ctx={ctx} aoMudar={(p) => mudar(m.codigo, p)} />
-            ))}
-          </Cartao>
-        ))}
+        <Campo rotulo="Procurar exame" value={busca} onChangeText={setBusca} placeholder="ex.: glicose, LDL, vitamina" autoCorrect={false} />
+
+        {GRUPOS.map((g) => {
+          const termo = semAcento(busca.trim().toLowerCase());
+          const lista = MARCADORES.filter(
+            (m) => m.grupo === g && (!termo || semAcento(`${m.nome} ${m.grupo}`.toLowerCase()).includes(termo) || lerNumero(entrada(m.codigo).valor) != null),
+          );
+          if (!lista.length) return null;
+          return (
+            <Cartao key={g} estilo={{ gap: 4 }}>
+              <Rotulo>{g}</Rotulo>
+              {lista.map((m) => (
+                <LinhaMarcador key={m.codigo} m={m} e={entrada(m.codigo)} ctx={ctx} aoMudar={(p) => mudar(m.codigo, p)} />
+              ))}
+            </Cartao>
+          );
+        })}
+        {busca.trim() !== '' && !MARCADORES.some((m) => semAcento(`${m.nome} ${m.grupo}`.toLowerCase()).includes(semAcento(busca.trim().toLowerCase()))) && (
+          <Nota>Nenhum exame com esse nome na lista. Os valores que não estão aqui podem ficar só no laudo anexado.</Nota>
+        )}
 
         <AvisoMedico />
         {erro && <Text style={{ fontSize: 14, fontWeight: '700', color: cores.laranja }}>{erro}</Text>}

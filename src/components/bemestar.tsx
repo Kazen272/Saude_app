@@ -1,4 +1,5 @@
 import { Link } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, Text, View, StyleSheet } from 'react-native';
 import Svg, { G, Line, Rect, Text as SvgTexto } from 'react-native-svg';
 
@@ -69,26 +70,60 @@ export function CartaoCheckin({
   alerta: boolean;
   aoMudar: (campo: 'energia' | 'fome' | 'humor', v: number) => void;
 }) {
-  const respondido = checkin && checkin.energia != null && checkin.fome != null && checkin.humor != null;
+  const respondido = checkin != null && checkin.energia != null && checkin.fome != null && checkin.humor != null;
+  const [editando, setEditando] = useState(false);
+  // Depois de responder, o cartão encolhe para uma linha; "editar" abre de novo.
+  const compacto = respondido && !editando;
+
+  const aviso = alerta && (
+    <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 12, padding: 12 }}>
+      <Text style={{ fontSize: 13, color: '#5C3410' }}>
+        <Text style={{ fontWeight: '700' }}>Energia baixa e fome alta há 3 dias. </Text>O déficit pode estar agressivo demais; vale conversar
+        com seu nutricionista ou médico sobre o ritmo.
+      </Text>
+    </View>
+  );
+
+  if (compacto) {
+    return (
+      <Cartao estilo={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: cores.cinza }}>Check-in de hoje</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>
+              Energia {checkin!.energia} · Fome {checkin!.fome} · Humor {checkin!.humor}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Editar check-in de hoje"
+            onPress={() => setEditando(true)}
+            style={{ minHeight: 40, paddingHorizontal: 12, borderRadius: 10, justifyContent: 'center', backgroundColor: cores.linhaSuave }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tintaSuave }}>Editar</Text>
+          </Pressable>
+        </View>
+        {aviso}
+      </Cartao>
+    );
+  }
+
   return (
     <Cartao estilo={{ gap: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Rotulo>Check-in de hoje</Rotulo>
-        <Text style={{ fontSize: 12, color: respondido ? cores.verde : cores.cinza, fontWeight: '700' }}>
-          {respondido ? 'respondido' : 'leva 5 segundos'}
-        </Text>
+        {respondido ? (
+          <Pressable accessibilityRole="button" onPress={() => setEditando(false)} style={{ minHeight: 28, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 12, color: cores.verde, fontWeight: '700' }}>pronto</Text>
+          </Pressable>
+        ) : (
+          <Text style={{ fontSize: 12, color: cores.cinza, fontWeight: '700' }}>leva 5 segundos</Text>
+        )}
       </View>
       <Escala campo="energia" valor={checkin?.energia ?? null} aoEscolher={(v) => aoMudar('energia', v)} />
       <Escala campo="fome" valor={checkin?.fome ?? null} aoEscolher={(v) => aoMudar('fome', v)} />
       <Escala campo="humor" valor={checkin?.humor ?? null} aoEscolher={(v) => aoMudar('humor', v)} />
-      {alerta && (
-        <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 12, padding: 12 }}>
-          <Text style={{ fontSize: 13, color: '#5C3410' }}>
-            <Text style={{ fontWeight: '700' }}>Energia baixa e fome alta há 3 dias. </Text>O déficit pode estar agressivo demais; vale conversar
-            com seu nutricionista ou médico sobre o ritmo.
-          </Text>
-        </View>
-      )}
+      {aviso}
     </Cartao>
   );
 }

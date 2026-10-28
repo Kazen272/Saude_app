@@ -43,6 +43,8 @@ export type EstadoSync = {
   /** Apps que escreveram cada tipo de dado na última leitura. */
   origens: { atividade: string[]; sono: string[]; treinos: string[]; dieta: string[]; peso: string[] };
   contagem: { dias: number; noites: number; treinos: number; diasDieta: number; pesagens: number };
+  /** Horário do dado mais recente do relógio que chegou ao Health Connect. */
+  ultimoDadoRelogio: string | null;
   erro: string | null;
 };
 
@@ -50,6 +52,7 @@ const ESTADO_VAZIO: EstadoSync = {
   ultimaSync: null,
   origens: { atividade: [], sono: [], treinos: [], dieta: [], peso: [] },
   contagem: { dias: 0, noites: 0, treinos: 0, diasDieta: 0, pesagens: 0 },
+  ultimoDadoRelogio: null,
   erro: null,
 };
 
@@ -209,6 +212,23 @@ async function executarSincronizacao(): Promise<EstadoSync> {
         }))
       : [];
     const noites = noitesPorDia(sonoBruto).filter((n) => n.dia >= somarDias(diaLocal(), -(DIAS - 1)));
+
+    // O Health Connect só recebe dados quando o app do relógio sincroniza:
+    // guarda o horário do dado mais recente para mostrar na tela.
+    const marcas: string[] = noites.map((n) => n.acordou);
+    if (tem(concedidas, 'Steps')) {
+      try {
+        const r = await readRecords('Steps', {
+          timeRangeFilter: { operator: 'between', startTime: inicioDaJanela(2), endTime: new Date().toISOString() },
+          ascendingOrder: false,
+          pageSize: 20,
+        });
+        marcas.push(...r.records.map((x) => x.endTime));
+      } catch {
+        // sem passos recentes: segue com as outras marcas
+      }
+    }
+    estado.ultimoDadoRelogio = marcas.length ? marcas.sort().at(-1) ?? null : anterior.ultimoDadoRelogio;
 
     const dias = new Set([...passos.porDia.keys(), ...ativas.porDia.keys(), ...totais.porDia.keys(), ...fcRepouso.keys(), ...noites.map((n) => n.dia)]);
     const linhasAtividade = [...dias].map((dia) => ({

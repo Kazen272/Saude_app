@@ -1,5 +1,6 @@
+import * as Linking from 'expo-linking';
 import { Redirect } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -16,6 +17,22 @@ export default function Login() {
   const [senha, setSenha] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'erro' | 'ok'; texto: string } | null>(null);
+
+  // Link de confirmação do e-mail: o Supabase devolve para o app com os tokens
+  // (saudeapp://login#access_token=...&refresh_token=...). Entra direto.
+  const url = Linking.useLinkingURL();
+  useEffect(() => {
+    if (!url || !url.includes('access_token')) return;
+    const fragmento = url.split('#')[1] ?? url.split('?')[1] ?? '';
+    const p = new URLSearchParams(fragmento);
+    const access_token = p.get('access_token');
+    const refresh_token = p.get('refresh_token');
+    if (access_token && refresh_token) {
+      supabase.auth
+        .setSession({ access_token, refresh_token })
+        .then(({ error }) => setMensagem(error ? { tipo: 'erro', texto: 'O link expirou. Entre com e-mail e senha.' } : { tipo: 'ok', texto: 'E-mail confirmado!' }));
+    }
+  }, [url]);
 
   if (sessao) return <Redirect href="/" />;
 
@@ -34,11 +51,11 @@ export default function Login() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: senha,
-          options: { data: { display_name: nome.trim() || undefined } },
+          options: { data: { display_name: nome.trim() || undefined }, emailRedirectTo: Linking.createURL('/login') },
         });
         if (error) throw error;
         if (!data.session) {
-          setMensagem({ tipo: 'ok', texto: 'Conta criada. Confirme pelo link enviado ao seu e-mail e depois entre aqui.' });
+          setMensagem({ tipo: 'ok', texto: 'Conta criada! Abra o e-mail neste celular e toque no link de confirmação: o app abre e você já entra.' });
           setModo('entrar');
         }
       }
