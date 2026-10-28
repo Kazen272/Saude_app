@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View, StyleSheet } from 'react-native';
 
 import { Botao, Cartao, Nota, estilos } from '@/components/ui';
 import { MAX_DISPAROS, SUGESTOES, descrever, disparos, type Lembrete } from '@/lib/lembretes-regras';
@@ -104,7 +104,7 @@ export default function Lembretes() {
       )}
 
       <Link href="/lembretes/editar" asChild>
-        <Pressable accessibilityRole="link" style={[estilos.botao, { backgroundColor: cores.verde, height: 54, borderRadius: 16 }]}>
+        <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.botao, { backgroundColor: cores.verde, height: 54, borderRadius: 16 }])}>
           <Text style={[estilos.botaoTexto, { color: '#FFFFFF', fontSize: 16, fontWeight: '800' }]}>Novo lembrete</Text>
         </Pressable>
       </Link>

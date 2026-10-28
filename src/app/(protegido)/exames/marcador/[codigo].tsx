@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { AvisoMedico, GraficoMarcador, SeloNivel, carregarContexto } from '@/components/exames';
 import { Cartao, Nota, estilos } from '@/components/ui';
-import { decimal, diaCurto } from '@/lib/datas';
+import { diaCurto, numeroCurto } from '@/lib/datas';
 import { listarExames, type Exame } from '@/lib/exames';
 import { classificar, marcador, type Contexto } from '@/lib/referencias';
 import { cores } from '@/lib/tema';
@@ -61,7 +61,7 @@ export default function HistoricoMarcador() {
               {diaCurto(l.dia)} {l.dia.slice(0, 4)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>{decimal(l.r.valor, Number.isInteger(l.r.valor) ? 0 : 1)}</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>{numeroCurto(l.r.valor)}</Text>
               {l.c && <SeloNivel c={l.c} />}
             </View>
           </View>

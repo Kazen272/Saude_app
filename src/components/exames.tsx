@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Text, View, type LayoutChangeEvent } from 'react-native';
+import { Text, View } from 'react-native';
 import Svg, { Circle, Line, Polyline, Rect, Text as SvgTexto } from 'react-native-svg';
 
-import { decimal, diaCurto } from '@/lib/datas';
+import { decimal, diaCurto, numeroCurto } from '@/lib/datas';
 import { carregarPerfil } from '@/lib/dados';
 import { idadeEmAnos } from '@/lib/calculos';
 import { diaLocal } from '@/lib/datas';
 import type { Classificacao, Contexto, Nivel } from '@/lib/referencias';
+import { useLarguraDoCartao } from '@/components/ui';
 import { cores } from '@/lib/tema';
 
 export const COR_NIVEL: Record<Nivel, { fundo: string; texto: string; nome: string }> = {
@@ -56,7 +56,7 @@ export function GraficoMarcador({
   faixa: { min: number | null; max: number | null };
   unidade: string;
 }) {
-  const [largura, setLargura] = useState(0);
+  const largura = useLarguraDoCartao();
   const altura = 180;
   if (pontos.length < 2) {
     return (
@@ -78,10 +78,10 @@ export function GraficoMarcador({
   const corPonto: Record<Nivel, string> = { adequado: cores.verde, atencao: cores.laranja, alterado: '#B42318' };
   const yFaixaTopo = y(faixa.max ?? maxY);
   const yFaixaBase = y(faixa.min ?? minY);
-  const descricao = pontos.map((p) => `${diaCurto(p.dia)}: ${decimal(p.valor, 1)} ${unidade}`).join(', ');
+  const descricao = pontos.map((p) => `${diaCurto(p.dia)}: ${numeroCurto(p.valor)} ${unidade}`).join(', ');
 
   return (
-    <View onLayout={(e: LayoutChangeEvent) => setLargura(Math.round(e.nativeEvent.layout.width))} accessible accessibilityRole="image" accessibilityLabel={`Evolução. ${descricao}`}>
+    <View accessible accessibilityRole="image" accessibilityLabel={`Evolução. ${descricao}`}>
       {largura > 0 && (
         <Svg width={w} height={altura}>
           {(faixa.min != null || faixa.max != null) && (

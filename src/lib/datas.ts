@@ -42,3 +42,8 @@ export function milhar(n: number): string {
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
+
+/** Número com até `max` casas e sem zeros no fim: 5.40 → "5,4", 104 → "104". */
+export function numeroCurto(n: number, max = 2): string {
+  return String(Math.round(n * 10 ** max) / 10 ** max).replace('.', ',');
+}

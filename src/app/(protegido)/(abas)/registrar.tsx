@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Botao, Cabecalho, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
@@ -95,7 +95,11 @@ export default function Registrar() {
             <Rotulo>Peso em jejum</Rotulo>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <BotaoRedondo texto="−" rotulo="Diminuir 0,1 kg" aoTocar={() => ajustar(-1)} />
-              <Text style={{ fontSize: 48, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={{ flexShrink: 1, textAlign: 'center', fontSize: 48, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}
+              >
                 {pesoDecimos == null ? '—' : decimal(pesoDecimos / 10)}
                 <Text style={{ fontSize: 18, fontWeight: '600', color: cores.cinza }}> kg</Text>
               </Text>
@@ -128,7 +132,7 @@ export default function Registrar() {
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Botao titulo="+ Copo 250" variante="agua" aoTocar={() => adicionarAgua(250)} />
+                <Botao titulo="+ 250 ml" rotuloAcessivel="Adicionar um copo de 250 ml" variante="agua" aoTocar={() => adicionarAgua(250)} />
               </View>
               <View style={{ flex: 1 }}>
                 <Botao titulo="+ 500 ml" variante="agua" aoTocar={() => adicionarAgua(500)} />
@@ -140,7 +144,7 @@ export default function Registrar() {
           </Cartao>
 
           <Link href="/sono" asChild>
-            <Pressable accessibilityRole="link" style={[estilos.cartao, { flexDirection: 'row', alignItems: 'center' }]}>
+            <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { flexDirection: 'row', alignItems: 'center' }])}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>Sono da última noite</Text>
                 <Text style={{ fontSize: 13, color: cores.cinza }}>que horas deitou e acordou</Text>

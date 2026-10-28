@@ -4,12 +4,12 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } 
 
 import { AvisoMedico, SeloNivel, carregarContexto } from '@/components/exames';
 import { Botao, Cartao, Nota, estilos } from '@/components/ui';
-import { decimal, diaCurto } from '@/lib/datas';
+import { diaCurto, numeroCurto } from '@/lib/datas';
 import { apagarExame, linkDoLaudo, listarExames, type Exame } from '@/lib/exames';
 import { MARCADORES, classificar, marcador, type Contexto } from '@/lib/referencias';
 import { cores } from '@/lib/tema';
 
-const valorTexto = (v: number) => decimal(v, Number.isInteger(v) ? 0 : v < 10 ? 2 : 1);
+const valorTexto = (v: number) => numeroCurto(v);
 
 export default function DetalheExame() {
   const { id } = useLocalSearchParams<{ id: string }>();

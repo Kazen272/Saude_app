@@ -1,9 +1,8 @@
 import { Link } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, Text, View, StyleSheet } from 'react-native';
 import Svg, { G, Line, Rect, Text as SvgTexto } from 'react-native-svg';
 
-import { Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { Cartao, Nota, Rotulo, estilos, useLarguraDoCartao } from '@/components/ui';
 import { formatarDuracao, formatarHora, type CheckIn, type Noite, type ResumoSono } from '@/lib/bemestar';
 import { diaLocal, somarDias } from '@/lib/datas';
 import { cores } from '@/lib/tema';
@@ -27,9 +26,9 @@ export function Escala({
   const titulo = campo.charAt(0).toUpperCase() + campo.slice(1);
   return (
     <View style={{ gap: 6 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 8 }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tinta }}>{titulo}</Text>
-        <Text style={{ fontSize: 12, color: cores.cinza }}>
+        <Text style={{ fontSize: 12, color: cores.cinza, flexShrink: 1 }}>
           1 = {ROTULOS[campo][0]} · 5 = {ROTULOS[campo][1]}
         </Text>
       </View>
@@ -97,7 +96,7 @@ export function CartaoCheckin({
 export function CartaoSono({ ultima, resumo }: { ultima: Noite | null; resumo: ResumoSono }) {
   return (
     <Link href="/sono" asChild>
-      <Pressable accessibilityRole="link" style={[estilos.cartao]}>
+      <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao])}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Rotulo>Sono</Rotulo>
           <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verde }}>{ultima ? 'ver semana' : 'registrar'}</Text>
@@ -130,7 +129,7 @@ const nomeDia = (dia: string) => DIAS_CURTOS[new Date(dia + 'T12:00:00').getDay(
 
 /** Barras das horas dormidas nas últimas 7 noites, com a linha de 7 h. */
 export function GraficoSono({ noites, ate = diaLocal() }: { noites: Noite[]; ate?: string }) {
-  const [largura, setLargura] = useState(0);
+  const largura = useLarguraDoCartao();
   const altura = 140;
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(ate, i - 6));
   if (!noites.length) {
@@ -146,7 +145,7 @@ export function GraficoSono({ noites, ate = diaLocal() }: { noites: Noite[]; ate
   const maxMin = Math.max(9 * 60, ...noites.map((n) => n.duracaoMin));
   const y = (min: number) => topo + (1 - min / maxMin) * (altura - topo - base);
   const coluna = w / 7;
-  const barra = Math.min(28, coluna * 0.55);
+  const barra = Math.min(32, coluna * 0.7);
   const descricao = dias
     .map((d) => {
       const n = noites.find((x) => x.dia === d);
@@ -154,7 +153,7 @@ export function GraficoSono({ noites, ate = diaLocal() }: { noites: Noite[]; ate
     })
     .join(', ');
   return (
-    <View onLayout={(e: LayoutChangeEvent) => setLargura(Math.round(e.nativeEvent.layout.width))} accessible accessibilityRole="image" accessibilityLabel={`Sono por noite. ${descricao}`}>
+    <View accessible accessibilityRole="image" accessibilityLabel={`Sono por noite. ${descricao}`}>
       {largura > 0 && (
         <Svg width={w} height={altura}>
           <Line x1={0} x2={w} y1={y(420)} y2={y(420)} stroke={cores.laranja} strokeDasharray="2 4" strokeWidth={1.25} />
@@ -169,7 +168,8 @@ export function GraficoSono({ noites, ate = diaLocal() }: { noites: Noite[]; ate
                 {n ? (
                   <>
                     <Rect x={cx - barra / 2} y={y(n.duracaoMin)} width={barra} height={y(0) - y(n.duracaoMin)} rx={4} fill={n.duracaoMin < 420 ? cores.azul : cores.verde} />
-                    <SvgTexto x={cx} y={y(n.duracaoMin) - 4} fontSize={10.5} fill={cores.tintaSuave} textAnchor="middle">
+                    {/* duração dentro da barra, para não brigar com a linha de 7 h */}
+                    <SvgTexto x={cx} y={y(n.duracaoMin) + 13} fontSize={10} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
                       {formatarDuracao(n.duracaoMin)}
                     </SvgTexto>
                   </>

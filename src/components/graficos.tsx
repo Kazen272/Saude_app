@@ -1,17 +1,13 @@
-import { useState } from 'react';
-import { Text, View, type LayoutChangeEvent } from 'react-native';
+import { Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Polyline, Rect, Text as SvgTexto } from 'react-native-svg';
 
 import type { Pesagem, Projecao } from '@/lib/calculos';
 import { decimal, diaCurto, milhar, somarDias } from '@/lib/datas';
+import { useLarguraDoCartao } from '@/components/ui';
 import { cores } from '@/lib/tema';
 
 const emDias = (dia: string) => Date.parse(dia + 'T00:00:00Z') / 86_400_000;
 
-function useLargura(): [number, (e: LayoutChangeEvent) => void] {
-  const [largura, setLargura] = useState(0);
-  return [largura, (e) => setLargura(Math.round(e.nativeEvent.layout.width))];
-}
 
 function Vazio({ altura, texto }: { altura: number; texto: string }) {
   return (
@@ -51,12 +47,12 @@ export function GraficoPeso({
   hoje: string;
   periodoDias: number;
 }) {
-  const [largura, aoMedir] = useLargura();
+  const largura = useLarguraDoCartao();
   const altura = 190;
 
   if (medias.length < 2) {
     return (
-      <View onLayout={aoMedir}>
+      <View>
         <Vazio altura={altura} texto="Registre o peso por alguns dias para ver a curva e a projeção." />
       </View>
     );
@@ -102,7 +98,7 @@ export function GraficoPeso({
   }`;
 
   return (
-    <View onLayout={aoMedir} accessible accessibilityRole="image" accessibilityLabel={descricao}>
+    <View accessible accessibilityRole="image" accessibilityLabel={descricao}>
       {largura > 0 && (
         <Svg width={w} height={altura}>
           {marcas.map((v) => (
@@ -169,12 +165,12 @@ const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 /** Barras do déficit diário: verde abaixo do gasto, laranja acima; dia sem dado em cinza. */
 export function GraficoDeficit({ dias, hoje }: { dias: { dia: string; deficit: number | null }[]; hoje: string }) {
-  const [largura, aoMedir] = useLargura();
+  const largura = useLarguraDoCartao();
   const altura = 150;
 
   if (dias.every((d) => d.deficit == null)) {
     return (
-      <View onLayout={aoMedir}>
+      <View>
         <Vazio altura={altura} texto="O déficit diário aparece aqui quando a dieta do FatSecret e o perfil estiverem completos." />
       </View>
     );
@@ -196,7 +192,7 @@ export function GraficoDeficit({ dias, hoje }: { dias: { dia: string; deficit: n
     .join(', ');
 
   return (
-    <View onLayout={aoMedir} accessible accessibilityRole="image" accessibilityLabel={`Déficit diário. ${descricao}`}>
+    <View accessible accessibilityRole="image" accessibilityLabel={`Déficit diário. ${descricao}`}>
       {largura > 0 && (
         <Svg width={w} height={altura}>
           {dias.map((d, i) => {

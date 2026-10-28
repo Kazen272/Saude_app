@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, StyleSheet } from 'react-native';
 
 import { AvisoMedico, COR_NIVEL, carregarContexto } from '@/components/exames';
 import { Cartao, Nota, estilos } from '@/components/ui';
@@ -46,7 +46,7 @@ export default function Exames() {
       )}
 
       <Link href="/exames/novo" asChild>
-        <Pressable accessibilityRole="link" style={[estilos.botao, { backgroundColor: cores.verde, height: 54, borderRadius: 16 }]}>
+        <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.botao, { backgroundColor: cores.verde, height: 54, borderRadius: 16 }])}>
           <Text style={[estilos.botaoTexto, { color: '#FFFFFF', fontSize: 16, fontWeight: '800' }]}>Adicionar exame</Text>
         </Pressable>
       </Link>
@@ -62,7 +62,7 @@ export default function Exames() {
         const t = contagem(e);
         return (
           <Link key={e.id} href={{ pathname: '/exames/[id]', params: { id: String(e.id) } }} asChild>
-            <Pressable accessibilityRole="link" style={[estilos.cartao, { gap: 8 }]}>
+            <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { gap: 8 }])}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 16, fontWeight: '800', color: cores.tinta }}>{diaCurto(e.dia)} {e.dia.slice(0, 4)}</Text>
                 <Text style={{ fontSize: 13, color: cores.cinza }}>{e.resultados.length} resultado{e.resultados.length === 1 ? '' : 's'}</Text>

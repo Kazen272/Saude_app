@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CartaoCheckin, CartaoSono } from '@/components/bemestar';
@@ -89,7 +89,7 @@ export default function Hoje() {
 
         {resumo && !resumo.perfilCompleto && (
           <Link href="/fontes" asChild>
-            <Pressable accessibilityRole="link" style={[estilos.cartao, { backgroundColor: cores.verdeClaro }]}>
+            <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { backgroundColor: cores.verdeClaro }])}>
               <Rotulo>Complete seu perfil</Rotulo>
               <Text style={{ fontSize: 14, color: cores.tintaSuave }}>
                 Sexo, data de nascimento e altura são necessários para calcular seu gasto calórico.
@@ -104,7 +104,7 @@ export default function Hoje() {
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <Cartao estilo={{ flex: 1 }}>
               <Rotulo>Água</Rotulo>
-              <Text style={estilos.numero}>
+              <Text style={estilos.numero} numberOfLines={1} adjustsFontSizeToFit>
                 {decimal(resumo.aguaMl / 1000, resumo.aguaMl % 1000 === 0 ? 0 : resumo.aguaMl % 100 === 0 ? 1 : 2)} L
                 <Text style={estilos.unidade}> / {decimal(resumo.perfil.water_goal_ml / 1000, 0)} L</Text>
               </Text>
@@ -113,7 +113,7 @@ export default function Hoje() {
             </Cartao>
             <Cartao estilo={{ flex: 1 }}>
               <Rotulo>Peso</Rotulo>
-              <Text style={estilos.numero}>
+              <Text style={estilos.numero} numberOfLines={1} adjustsFontSizeToFit>
                 {resumo.pesoAtual != null ? decimal(resumo.pesoAtual) : '—'}
                 <Text style={estilos.unidade}> kg</Text>
               </Text>
@@ -125,7 +125,7 @@ export default function Hoje() {
                     : `↑ ${decimal(resumo.variacaoSemanaKg)} kg na semana`}
               </Text>
               <Link href="/registrar" asChild>
-                <Pressable accessibilityRole="link" style={[estilos.botao, { backgroundColor: cores.verdeClaro }]}>
+                <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.botao, { backgroundColor: cores.verdeClaro }])}>
                   <Text style={[estilos.botaoTexto, { color: cores.verdeEscuro }]}>Registrar</Text>
                 </Pressable>
               </Link>
@@ -269,7 +269,7 @@ function CartaoProjecao({ resumo }: { resumo: ResumoDoDia }) {
   }
   return (
     <Link href="/progresso" asChild>
-      <Pressable accessibilityRole="link" style={[estilos.cartao, { backgroundColor: cores.verdeClaro, gap: 2 }]}>
+      <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { backgroundColor: cores.verdeClaro, gap: 2 }])}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verdeEscuro }}>Projeção</Text>
         <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>{titulo}</Text>
         <Text style={{ fontSize: 13, color: cores.tintaSuave }}>{detalhe}</Text>

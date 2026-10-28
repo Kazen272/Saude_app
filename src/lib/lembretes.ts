@@ -90,6 +90,7 @@ export async function pedirPermissao(): Promise<boolean> {
  * igual ao que está no banco (inclusive num celular novo).
  */
 export async function sincronizarAgendamentos(lista?: Lembrete[]): Promise<{ agendados: number; semPermissao: boolean }> {
+  if (Platform.OS === 'web') return { agendados: 0, semPermissao: false };
   const lembretes = lista ?? (await listarLembretes());
   const ativos = lembretes.filter((l) => l.ativo);
   await Notifications.cancelAllScheduledNotificationsAsync();

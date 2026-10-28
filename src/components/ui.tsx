@@ -1,7 +1,16 @@
 import { Children, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { cores, raio } from '@/lib/tema';
+
+/**
+ * Largura útil dentro de um cartão: tela − margens da página (2 × 20) − margens
+ * do cartão (2 × 16). Usada pelos gráficos, que precisam de uma largura em pixels.
+ */
+export function useLarguraDoCartao(): number {
+  const { width } = useWindowDimensions();
+  return Math.max(220, Math.round(width - 72));
+}
 
 export function Cartao({ children, estilo }: { children: ReactNode; estilo?: ViewStyle }) {
   return <View style={[estilos.cartao, estilo]}>{children}</View>;

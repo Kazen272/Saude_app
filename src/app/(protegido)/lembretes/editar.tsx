@@ -129,7 +129,7 @@ export default function EditarLembrete() {
               );
             })}
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <Atalho texto="Todo dia" aoTocar={() => mudar({ dias: [1, 2, 3, 4, 5, 6, 7] })} />
             <Atalho texto="Seg a Sex" aoTocar={() => mudar({ dias: [2, 3, 4, 5, 6] })} />
             <Atalho texto="Fim de semana" aoTocar={() => mudar({ dias: [1, 7] })} />

@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradeCheckins, GraficoSono } from '@/components/bemestar';
@@ -69,7 +69,7 @@ export default function Progresso() {
         <Cabecalho sobre={atual.sobre} titulo="Progresso" />
 
         <Link href="/relatorio" asChild>
-          <Pressable accessibilityRole="link" style={[estilos.cartao, { backgroundColor: cores.tinta, flexDirection: 'row', alignItems: 'center' }]}>
+          <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { backgroundColor: cores.tinta, flexDirection: 'row', alignItems: 'center' }])}>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>Relatório da semana</Text>
               <Text style={{ fontSize: 13, color: cores.escuroSuave }}>o que melhorou e o que piorou</Text>
