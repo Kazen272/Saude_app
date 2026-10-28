@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { cores, raio } from '@/lib/tema';
@@ -72,16 +72,35 @@ export function Botao({
   );
 }
 
+/**
+ * Campo de texto com rótulo. Ocupa a largura disponível; para pôr campos lado a
+ * lado, use <LinhaCampos>, que divide a largura sem achatar a altura.
+ */
 export function Campo({ rotulo, ...props }: TextInputProps & { rotulo: string }) {
   return (
-    <View style={{ gap: 4, flex: 1 }}>
-      <Text style={estilos.campoRotulo}>{rotulo}</Text>
+    <View style={{ gap: 4, alignSelf: 'stretch' }}>
+      <Text style={estilos.campoRotulo} numberOfLines={2}>
+        {rotulo}
+      </Text>
       <TextInput
         accessibilityLabel={rotulo}
         placeholderTextColor={cores.cinza}
         style={estilos.campo}
         {...props}
       />
+    </View>
+  );
+}
+
+/** Coloca campos lado a lado, com larguras iguais. */
+export function LinhaCampos({ children }: { children: ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+      {Children.toArray(children).map((filho, i) => (
+        <View key={i} style={{ flex: 1, minWidth: 0 }}>
+          {filho}
+        </View>
+      ))}
     </View>
   );
 }

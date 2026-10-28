@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { AvisoMedico, SeloNivel, carregarContexto } from '@/components/exames';
-import { Botao, Campo, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { Botao, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import { diaLocal } from '@/lib/datas';
 import { escolherLaudo, salvarExame, type ArquivoEscolhido, type Resultado } from '@/lib/exames';
 import { MARCADORES, classificar, type Contexto, type Marcador } from '@/lib/referencias';
@@ -88,10 +88,10 @@ export default function NovoExame() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={[estilos.conteudo, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
         <Cartao estilo={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <LinhaCampos>
             <Campo rotulo="Data da coleta" value={data} onChangeText={setData} placeholder="dd/mm/aaaa" keyboardType="numbers-and-punctuation" />
             <Campo rotulo="Laboratório (opcional)" value={laboratorio} onChangeText={setLaboratorio} maxLength={120} />
-          </View>
+          </LinhaCampos>
           <Pressable
             accessibilityRole="button"
             onPress={anexar}
@@ -161,10 +161,10 @@ function LinhaMarcador({ m, e, ctx, aoMudar }: { m: Marcador; e: Entrada; ctx: C
         </Text>
       </Pressable>
       {e.abrirFaixa && (
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <LinhaCampos>
           <Campo rotulo={`Mínimo (${m.unidade})`} value={e.min} onChangeText={(t) => aoMudar({ min: t })} keyboardType="decimal-pad" />
           <Campo rotulo={`Máximo (${m.unidade})`} value={e.max} onChangeText={(t) => aoMudar({ max: t })} keyboardType="decimal-pad" />
-        </View>
+        </LinhaCampos>
       )}
       {m.nota && valor != null && <Text style={{ fontSize: 12, color: cores.cinza }}>{m.nota}</Text>}
     </View>

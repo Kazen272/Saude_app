@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
-import { Botao, Campo, Cartao, Nota, estilos } from '@/components/ui';
+import { Botao, Campo, LinhaCampos, Cartao, Nota, estilos } from '@/components/ui';
 import { NOMES_DIAS, descrever, validar, type Lembrete, type TipoLembrete } from '@/lib/lembretes-regras';
 import { apagarLembrete, listarLembretes, salvarLembrete, sincronizarAgendamentos } from '@/lib/lembretes';
 import { cores } from '@/lib/tema';
@@ -195,10 +195,10 @@ export default function EditarLembrete() {
                   />
                 ))}
               </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
+              <LinhaCampos>
                 <Campo rotulo="Começa às" value={l.inicio ?? ''} onChangeText={(t) => mudar({ inicio: t })} placeholder="09:00" keyboardType="numbers-and-punctuation" />
                 <Campo rotulo="Termina às" value={l.fim ?? ''} onChangeText={(t) => mudar({ fim: t })} placeholder="21:00" keyboardType="numbers-and-punctuation" />
-              </View>
+              </LinhaCampos>
             </>
           )}
         </Cartao>

@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Botao, Cabecalho, Campo, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
+import { Botao, Cabecalho, Campo, LinhaCampos, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
 import type { Sexo } from '@/lib/calculos';
 import { carregarPerfil, salvarPerfil, type Perfil } from '@/lib/dados';
 import { decimal } from '@/lib/datas';
@@ -119,10 +119,10 @@ export default function Fontes() {
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <LinhaCampos>
               <Campo rotulo="Nascimento" placeholder="dd/mm/aaaa" value={nascimento} onChangeText={setNascimento} keyboardType="numbers-and-punctuation" />
               <Campo rotulo="Altura (cm)" placeholder="178" value={altura} onChangeText={setAltura} keyboardType="decimal-pad" />
-            </View>
+            </LinhaCampos>
             <Campo rotulo="Meta de peso (kg)" placeholder="85" value={meta} onChangeText={setMeta} keyboardType="decimal-pad" />
 
             <View style={{ gap: 6 }}>

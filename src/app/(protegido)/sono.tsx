@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { GraficoSono } from '@/components/bemestar';
-import { Botao, Campo, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { Botao, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import { duracaoSono, formatarDuracao, formatarHora, lerHora, resumirSono, type Noite } from '@/lib/bemestar';
 import { carregarNoites, registrarSono } from '@/lib/bemestar-dados';
 import { diaCurto, diaLocal, somarDias } from '@/lib/datas';
@@ -86,10 +86,10 @@ export default function Sono() {
               </Pressable>
             ))}
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <LinhaCampos>
             <Campo rotulo="Deitei às" value={deitou} onChangeText={setDeitou} placeholder="23:00" keyboardType="numbers-and-punctuation" />
             <Campo rotulo="Acordei às" value={acordou} onChangeText={setAcordou} placeholder="07:00" keyboardType="numbers-and-punctuation" />
-          </View>
+          </LinhaCampos>
           <Nota>{duracao != null ? `Total: ${formatarDuracao(duracao)}` : 'Use o formato 23:30.'}</Nota>
           <View style={{ gap: 6 }}>
             <Text style={estilos.campoRotulo}>Como dormiu? (opcional)</Text>

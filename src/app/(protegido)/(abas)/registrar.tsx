@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Botao, Cabecalho, Campo, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
+import { Botao, Cabecalho, Campo, LinhaCampos, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import { mediaMovel } from '@/lib/calculos';
 import { carregarPesagens, registrarAgua, registrarCorpo } from '@/lib/dados';
 import { dataPorExtenso, decimal, diaLocal } from '@/lib/datas';
@@ -112,11 +112,11 @@ export default function Registrar() {
             <Rotulo>
               Medidas <Text style={{ fontWeight: '500', color: cores.cinza }}>(opcional, 1× por semana)</Text>
             </Rotulo>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
+            <LinhaCampos>
               <Campo rotulo="Cintura (cm)" value={cintura} onChangeText={setCintura} keyboardType="decimal-pad" />
               <Campo rotulo="Quadril (cm)" value={quadril} onChangeText={setQuadril} keyboardType="decimal-pad" />
               <Campo rotulo="% gordura" value={gordura} onChangeText={setGordura} keyboardType="decimal-pad" />
-            </View>
+            </LinhaCampos>
           </Cartao>
 
           <Cartao estilo={{ gap: 12 }}>
