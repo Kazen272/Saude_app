@@ -39,5 +39,5 @@ Pelo site do Expo (projeto ligado a este repositório): **Builds → Build from 
 - [x] Cálculos: metabolismo basal, gasto, déficit, média móvel, projeção, recalibração
 - [ ] Leitura do Health Connect (relógio e Hevy)
 - [ ] Dieta do FatSecret (depende do teste do Health Connect)
-- [ ] Gráficos de progresso
-- [ ] Fotos de progresso
+- [x] Gráficos de progresso: peso com média, meta e projeção; déficit diário; resumo da semana; previsto × real
+- [x] Fotos de progresso: câmera ou galeria, pasta privada, comparativo antes × agora e linha do tempo

@@ -22,7 +22,15 @@
       "predictiveBackGestureEnabled": false
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O app usa a câmera para tirar as fotos de progresso.",
+          "photosPermission": "O app acessa suas fotos para você escolher fotos de progresso.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "eas": {
