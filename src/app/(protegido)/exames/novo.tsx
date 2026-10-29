@@ -98,7 +98,7 @@ export default function NovoExame() {
           <Pressable
             accessibilityRole="button"
             onPress={anexar}
-            style={{ minHeight: 48, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: laudo ? cores.verde : '#9AA39D', alignItems: 'center', justifyContent: 'center', padding: 12 }}
+            style={{ minHeight: 48, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: laudo ? cores.verde : cores.placeholder, alignItems: 'center', justifyContent: 'center', padding: 12 }}
           >
             <Text style={{ fontSize: 14, fontWeight: '700', color: laudo ? cores.verdeEscuro : cores.tintaSuave }} numberOfLines={1}>
               {laudo ? `Laudo: ${laudo.nome}` : 'Anexar laudo (PDF ou foto)'}
@@ -171,7 +171,7 @@ function LinhaMarcador({ m, e, ctx, aoMudar }: { m: Marcador; e: Entrada; ctx: C
         </View>
       )}
       <Pressable accessibilityRole="button" onPress={() => aoMudar({ abrirFaixa: !e.abrirFaixa })} style={{ minHeight: 32, justifyContent: 'center' }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verde }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verdeTexto }}>
           {e.abrirFaixa ? 'ocultar faixa do laboratório' : m.variaPorLaboratorio ? 'faixa do laboratório (recomendado)' : 'faixa do laboratório'}
         </Text>
       </Pressable>

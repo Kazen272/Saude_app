@@ -2,7 +2,7 @@ import { Children, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { diaLocal, mascaraData, mascaraHora, nomeDoDia, somarDias } from '@/lib/datas';
-import { cores, raio } from '@/lib/tema';
+import { cores, porTema, raio } from '@/lib/tema';
 
 /**
  * Largura útil dentro de um cartão: tela − margens da página (2 × 20) − margens
@@ -118,7 +118,7 @@ export function LinhaCampos({ children }: { children: ReactNode }) {
 export function Pilula({ texto, tom = 'verde' }: { texto: string; tom?: 'verde' | 'laranja' | 'cinza' }) {
   const cor = {
     verde: { fundo: cores.verdeClaro, texto: cores.verdeEscuro },
-    laranja: { fundo: cores.laranjaClaro, texto: '#8A4A14' },
+    laranja: { fundo: cores.laranjaClaro, texto: cores.laranjaTexto },
     cinza: { fundo: cores.linhaSuave, texto: cores.cinza },
   }[tom];
   return (
@@ -128,30 +128,32 @@ export function Pilula({ texto, tom = 'verde' }: { texto: string; tom?: 'verde' 
   );
 }
 
-export const estilos = StyleSheet.create({
-  tela: { flex: 1, backgroundColor: cores.fundo },
+export const estilos = porTema((c) =>
+  StyleSheet.create({
+  tela: { flex: 1, backgroundColor: c.fundo },
   conteudo: { padding: 20, paddingTop: 24, gap: 14 },
-  cartao: { backgroundColor: cores.cartao, borderRadius: raio.cartao, padding: 16, gap: 10 },
-  sobre: { fontSize: 13, fontWeight: '600', color: cores.cinza },
-  titulo: { fontSize: 26, fontWeight: '800', color: cores.tinta, letterSpacing: -0.5 },
-  rotulo: { fontSize: 13, fontWeight: '700', color: cores.tinta },
-  nota: { fontSize: 13, color: cores.cinza },
-  numero: { fontSize: 24, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] },
-  unidade: { fontSize: 14, fontWeight: '600', color: cores.cinza },
+  cartao: { backgroundColor: c.cartao, borderRadius: raio.cartao, padding: 16, gap: 10 },
+  sobre: { fontSize: 13, fontWeight: '600', color: c.cinza },
+  titulo: { fontSize: 26, fontWeight: '800', color: c.tinta, letterSpacing: -0.5 },
+  rotulo: { fontSize: 13, fontWeight: '700', color: c.tinta },
+  nota: { fontSize: 13, color: c.cinza },
+  numero: { fontSize: 24, fontWeight: '800', color: c.tinta, fontVariant: ['tabular-nums'] },
+  unidade: { fontSize: 14, fontWeight: '600', color: c.cinza },
   botao: { height: 48, borderRadius: raio.botao, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   botaoTexto: { fontSize: 14, fontWeight: '700' },
-  campoRotulo: { fontSize: 12, fontWeight: '600', color: cores.tintaSuave },
+  campoRotulo: { fontSize: 12, fontWeight: '600', color: c.tintaSuave },
   campo: {
     height: 48,
     borderWidth: 1,
-    borderColor: '#D5DAD3',
+    borderColor: c.campoBorda,
     borderRadius: 10,
     paddingHorizontal: 12,
     fontSize: 16,
-    color: cores.tinta,
-    backgroundColor: '#FAFBF9',
+    color: c.tinta,
+    backgroundColor: c.campoFundo,
   },
-});
+}),
+);
 
 /** Escolhe um dia: ‹ Hoje ›. Não deixa ir para o futuro nem mais de `maxDias` para trás. */
 export function SeletorDia({ dia, aoMudar, maxDias = 60 }: { dia: string; aoMudar: (d: string) => void; maxDias?: number }) {

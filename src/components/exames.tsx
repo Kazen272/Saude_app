@@ -7,13 +7,13 @@ import { idadeEmAnos } from '@/lib/calculos';
 import { diaLocal } from '@/lib/datas';
 import type { Classificacao, Contexto, Nivel } from '@/lib/referencias';
 import { useLarguraDoCartao } from '@/components/ui';
-import { cores } from '@/lib/tema';
+import { cores, porTema } from '@/lib/tema';
 
-export const COR_NIVEL: Record<Nivel, { fundo: string; texto: string; nome: string }> = {
+export const COR_NIVEL: Record<Nivel, { fundo: string; texto: string; nome: string }> = porTema(() => ({
   adequado: { fundo: cores.verdeClaro, texto: cores.verdeEscuro, nome: 'Dentro do esperado' },
-  atencao: { fundo: cores.laranjaClaro, texto: '#8A4A14', nome: 'Atenção' },
-  alterado: { fundo: '#F6DCDC', texto: '#8A1F1F', nome: 'Alterado' },
-};
+  atencao: { fundo: cores.laranjaClaro, texto: cores.laranjaTexto, nome: 'Atenção' },
+  alterado: { fundo: cores.vermelhoClaro, texto: cores.vermelhoTexto, nome: 'Alterado' },
+}));
 
 export function SeloNivel({ c }: { c: Classificacao }) {
   const cor = COR_NIVEL[c.nivel];
@@ -30,7 +30,7 @@ export function SeloNivel({ c }: { c: Classificacao }) {
 
 export function AvisoMedico() {
   return (
-    <View style={{ backgroundColor: '#E7EAE4', borderRadius: 14, padding: 14 }}>
+    <View style={{ backgroundColor: cores.segmento, borderRadius: 14, padding: 14 }}>
       <Text style={{ fontSize: 13, color: cores.tintaSuave }}>
         <Text style={{ fontWeight: '700' }}>Só uma indicação. </Text>
         As faixas usam referências gerais por idade e sexo, ou a do seu laboratório quando informada. Quem interpreta os resultados é o seu
@@ -95,7 +95,7 @@ export function GraficoMarcador({
           <Line x1={m.esq} x2={w - m.dir} y1={altura - m.base} y2={altura - m.base} stroke={cores.linha} />
           <Polyline points={pontos.map((p) => `${x(p.dia)},${y(p.valor)}`).join(' ')} fill="none" stroke={cores.tintaSuave} strokeWidth={2} />
           {pontos.map((p) => (
-            <Circle key={p.dia} cx={x(p.dia)} cy={y(p.valor)} r={5} fill={corPonto[p.nivel]} stroke="#FFFFFF" strokeWidth={1.5} />
+            <Circle key={p.dia} cx={x(p.dia)} cy={y(p.valor)} r={5} fill={corPonto[p.nivel]} stroke={cores.cartao} strokeWidth={1.5} />
           ))}
           <SvgTexto x={m.esq} y={altura - 6} fontSize={11} fill={cores.cinza}>
             {diaCurto(pontos[0].dia)}

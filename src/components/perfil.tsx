@@ -120,7 +120,7 @@ export function FormularioPerfil({ tituloBotao = 'Salvar perfil', aoSalvar, semC
       </LinhaCampos>
       {sugestaoAgua != null && (
         <Pressable accessibilityRole="button" onPress={() => setAgua(decimal(sugestaoAgua / 1000, sugestaoAgua % 1000 ? (sugestaoAgua % 100 ? 2 : 1) : 0))} style={{ minHeight: 32, justifyContent: 'center' }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: cores.verde }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: cores.verdeTexto }}>
             Usar sugestão pelo seu peso: {decimal(sugestaoAgua / 1000, sugestaoAgua % 1000 ? (sugestaoAgua % 100 ? 2 : 1) : 0)} L (35 ml por kg)
           </Text>
         </Pressable>
@@ -147,7 +147,7 @@ export function FormularioPerfil({ tituloBotao = 'Salvar perfil', aoSalvar, semC
                 }}
               >
                 <Text style={{ fontSize: 14, fontWeight: '700', color: ativa ? '#FFFFFF' : cores.tinta }}>{n.nome}</Text>
-                <Text style={{ fontSize: 12, color: ativa ? '#E3EFE9' : cores.cinza }}>{n.detalhe}</Text>
+                <Text style={{ fontSize: 12, color: ativa ? cores.verdeClaro : cores.cinza }}>{n.detalhe}</Text>
               </Pressable>
             );
           })}

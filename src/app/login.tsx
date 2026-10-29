@@ -113,7 +113,7 @@ export default function Login() {
           }}
           style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={{ fontSize: 15, fontWeight: '700', color: cores.verde }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: cores.verdeTexto }}>
             {modo === 'entrar' ? 'Não tem conta? Criar agora' : 'Já tem conta? Entrar'}
           </Text>
         </Pressable>

@@ -132,7 +132,7 @@ export function GraficoPeso({
             />
           )}
           <Polyline points={pontos} fill="none" stroke={cores.verde} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-          <Circle cx={x(ultima.dia)} cy={y(ultima.pesoKg)} r={5} fill="#FFFFFF" stroke={cores.verde} strokeWidth={2.5} />
+          <Circle cx={x(ultima.dia)} cy={y(ultima.pesoKg)} r={5} fill={cores.cartao} stroke={cores.verde} strokeWidth={2.5} />
           <SvgTexto x={x(ultima.dia)} y={y(ultima.pesoKg) - 10} fontSize={11} fontWeight="700" fill={cores.tinta} textAnchor="middle">
             {decimal(ultima.pesoKg)}
           </SvgTexto>

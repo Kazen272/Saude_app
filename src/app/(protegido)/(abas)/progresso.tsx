@@ -71,7 +71,7 @@ export default function Progresso() {
         <Cabecalho sobre="Peso, energia, sono e hábitos" titulo="Progresso" />
 
         <Link href="/relatorio" asChild>
-          <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { backgroundColor: cores.tinta, flexDirection: 'row', alignItems: 'center' }])}>
+          <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao, { backgroundColor: cores.painel, flexDirection: 'row', alignItems: 'center' }])}>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF' }}>Relatório da semana</Text>
               <Text style={{ fontSize: 13, color: cores.escuroSuave }}>o que melhorou e o que piorou</Text>
@@ -82,7 +82,7 @@ export default function Progresso() {
 
         {erro && (
           <Cartao estilo={{ backgroundColor: cores.laranjaClaro }}>
-            <Text style={{ color: '#5C3410', fontSize: 14 }}>{erro}</Text>
+            <Text style={{ color: cores.laranjaTexto, fontSize: 14 }}>{erro}</Text>
           </Cartao>
         )}
 
@@ -101,7 +101,7 @@ export default function Progresso() {
               {dados?.perfil.goal_weight_kg != null ? `meta: ${decimal(dados.perfil.goal_weight_kg, dados.perfil.goal_weight_kg % 1 ? 1 : 0)} kg` : 'meta não definida'}
             </Text>
           </View>
-          <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, backgroundColor: '#E7EAE4', borderRadius: 12, padding: 4 }}>
+          <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, backgroundColor: cores.segmento, borderRadius: 12, padding: 4 }}>
             {PERIODOS.map((p) => {
               const ativo = p.dias === periodo;
               return (
@@ -253,7 +253,7 @@ export default function Progresso() {
 
         {/* Previsto × real */}
         <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 18, padding: 16, gap: 4 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#8A4A14' }}>Previsto × real</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: cores.laranjaTexto }}>Previsto × real</Text>
           <Text style={{ fontSize: 14, fontWeight: '600', color: cores.tinta }}>{textoPrevistoReal(dados)}</Text>
         </View>
       </ScrollView>

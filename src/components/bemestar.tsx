@@ -77,7 +77,7 @@ export function CartaoCheckin({
 
   const aviso = alerta && (
     <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 12, padding: 12 }}>
-      <Text style={{ fontSize: 13, color: '#5C3410' }}>
+      <Text style={{ fontSize: 13, color: cores.laranjaTexto }}>
         <Text style={{ fontWeight: '700' }}>Energia baixa e fome alta há 3 dias. </Text>O déficit pode estar agressivo demais; vale conversar
         com seu nutricionista ou médico sobre o ritmo.
       </Text>
@@ -114,7 +114,7 @@ export function CartaoCheckin({
         <Rotulo>Check-in de hoje</Rotulo>
         {respondido ? (
           <Pressable accessibilityRole="button" onPress={() => setEditando(false)} style={{ minHeight: 28, justifyContent: 'center' }}>
-            <Text style={{ fontSize: 12, color: cores.verde, fontWeight: '700' }}>pronto</Text>
+            <Text style={{ fontSize: 12, color: cores.verdeTexto, fontWeight: '700' }}>pronto</Text>
           </Pressable>
         ) : (
           <Text style={{ fontSize: 12, color: cores.cinza, fontWeight: '700' }}>leva 5 segundos</Text>
@@ -134,7 +134,7 @@ export function CartaoSono({ ultima, resumo }: { ultima: Noite | null; resumo: R
       <Pressable accessibilityRole="link" style={StyleSheet.flatten([estilos.cartao])}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Rotulo>Sono</Rotulo>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verde }}>{ultima ? 'ver semana' : 'registrar'}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verdeTexto }}>{ultima ? 'ver semana' : 'registrar'}</Text>
         </View>
         {ultima ? (
           <View style={{ flexDirection: 'row' }}>
@@ -259,10 +259,10 @@ export function GradeCheckins({ checkins, ate = diaLocal() }: { checkins: CheckI
                     borderRadius: 14,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: v == null ? cores.linhaSuave : bom ? cores.verdeClaro : ruim ? cores.laranjaClaro : '#EEF0EC',
+                    backgroundColor: v == null ? cores.linhaSuave : bom ? cores.verdeClaro : ruim ? cores.laranjaClaro : cores.linhaSuave,
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: v == null ? cores.cinza : bom ? cores.verdeEscuro : ruim ? '#8A4A14' : cores.tintaSuave }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: v == null ? cores.cinza : bom ? cores.verdeEscuro : ruim ? cores.laranjaTexto : cores.tintaSuave }}>
                     {v ?? '·'}
                   </Text>
                 </View>

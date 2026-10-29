@@ -121,7 +121,7 @@ export default function Registrar() {
           <Cartao estilo={{ gap: 12 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Rotulo>Peso em jejum</Rotulo>
-              {jaTinha && <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verde }}>já registrado · editar</Text>}
+              {jaTinha && <Text style={{ fontSize: 12, fontWeight: '700', color: cores.verdeTexto }}>já registrado · editar</Text>}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <BotaoRedondo texto="−" rotulo="Diminuir 0,1 kg" aoTocar={() => ajustar(-0.1)} />
@@ -204,7 +204,7 @@ export default function Registrar() {
                             value={medidas[col]}
                             onChangeText={(t) => mudarMedida(col, t)}
                             placeholder={ultimas[col] != null ? decimal(ultimas[col] as number, Number.isInteger(ultimas[col]) ? 0 : 1) : ''}
-                            placeholderTextColor={COR_ULTIMA}
+                            placeholderTextColor={cores.placeholder}
                             keyboardType="decimal-pad"
                             style={[estilos.campo, { width: 84, paddingHorizontal: 4, textAlign: 'center' }]}
                           />
@@ -225,7 +225,7 @@ export default function Registrar() {
               accessibilityLiveRegion="polite"
               style={{ backgroundColor: mensagem.tipo === 'ok' ? cores.verdeClaro : cores.laranjaClaro, borderRadius: 14, padding: 14 }}
             >
-              <Text style={{ fontSize: 14, fontWeight: '700', textAlign: 'center', color: mensagem.tipo === 'ok' ? cores.verdeEscuro : '#5C3410' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', textAlign: 'center', color: mensagem.tipo === 'ok' ? cores.verdeEscuro : cores.laranjaTexto }}>
                 {mensagem.texto}
               </Text>
             </View>
@@ -255,7 +255,7 @@ export default function Registrar() {
           <Atalho href={{ pathname: '/historico', params: { dia } }} titulo="Revisar e corrigir este dia" detalhe="apagar água, peso ou sono registrados errado" />
           <Atalho href="/sono" titulo="Sono da última noite" detalhe="que horas deitou e acordou" />
 
-          <View style={{ backgroundColor: '#E7EAE4', borderRadius: 14, padding: 14 }}>
+          <View style={{ backgroundColor: cores.segmento, borderRadius: 14, padding: 14 }}>
             <Nota>Treinos e refeições não precisam ser digitados: vêm do Hevy e do FatSecret pelo Health Connect.</Nota>
           </View>
         </ScrollView>
@@ -264,7 +264,7 @@ export default function Registrar() {
   );
 }
 
-const COR_ULTIMA = '#8A938D';
+
 
 function vazias(): Record<Coluna, string> {
   return Object.fromEntries(COLUNAS.map((c) => [c, ''])) as Record<Coluna, string>;
@@ -291,7 +291,7 @@ function CampoMedida({
       onChangeText={(t) => aoMudar(coluna, t)}
       keyboardType="decimal-pad"
       placeholder={ultima != null ? decimal(ultima, Number.isInteger(ultima) ? 0 : 1) : ''}
-      placeholderTextColor={COR_ULTIMA}
+      placeholderTextColor={cores.placeholder}
     />
   );
 }

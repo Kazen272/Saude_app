@@ -7,7 +7,7 @@ import { Cartao, Nota, Rotulo, useLarguraDoCartao } from '@/components/ui';
 import type { NivelCintura } from '@/lib/calculos';
 import { decimal, diaCurto } from '@/lib/datas';
 import { tom, type Ponto, type ResumoMedida } from '@/lib/medidas';
-import { cores } from '@/lib/tema';
+import { cores, porTema } from '@/lib/tema';
 
 const cm = (n: number) => decimal(n, Number.isInteger(n) ? 0 : 1);
 
@@ -22,11 +22,11 @@ export function textoDelta(d: number | null): string {
   return `${d < 0 ? '−' : '+'}${decimal(Math.abs(d), 1)}`;
 }
 
-const TONS = {
+const TONS = porTema(() => ({
   bom: { fundo: cores.verdeClaro, cor: cores.verdeEscuro },
-  ruim: { fundo: cores.laranjaClaro, cor: '#8A4A14' },
+  ruim: { fundo: cores.laranjaClaro, cor: cores.laranjaTexto },
   neutro: { fundo: cores.linhaSuave, cor: cores.tintaSuave },
-};
+}));
 
 export function PilulaDelta({ resumo, delta }: { resumo: ResumoMedida; delta: number | null }) {
   if (delta == null) return <View style={{ width: 64 }} />;
@@ -38,11 +38,11 @@ export function PilulaDelta({ resumo, delta }: { resumo: ResumoMedida; delta: nu
   );
 }
 
-const NIVEL_CINTURA: Record<NivelCintura, { texto: string; cor: string; fundo: string }> = {
+const NIVEL_CINTURA: Record<NivelCintura, { texto: string; cor: string; fundo: string }> = porTema(() => ({
   adequado: { texto: 'adequada', cor: cores.verdeEscuro, fundo: cores.verdeClaro },
-  atencao: { texto: 'atenção', cor: '#8A4A14', fundo: cores.laranjaClaro },
-  alto: { texto: 'alta', cor: '#8A1F1F', fundo: '#F6DCDC' },
-};
+  atencao: { texto: 'atenção', cor: cores.laranjaTexto, fundo: cores.laranjaClaro },
+  alto: { texto: 'alta', cor: cores.vermelhoTexto, fundo: cores.vermelhoClaro },
+}));
 
 /** Cartão do Progresso: cada medida com a diferença para a anterior ou para a primeira. */
 export function CartaoMedidas({
@@ -75,7 +75,7 @@ export function CartaoMedidas({
         <Text style={{ fontSize: 12, color: cores.cinza }}>última: {diaCurto(ultimoDia)}</Text>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 4, backgroundColor: '#E7EAE4', borderRadius: 12, padding: 4 }}>
+      <View style={{ flexDirection: 'row', gap: 4, backgroundColor: cores.segmento, borderRadius: 12, padding: 4 }}>
         {(
           [
             ['anterior', 'vs. anterior'],
@@ -190,7 +190,7 @@ export function GraficoMedida({ resumo }: { resumo: ResumoMedida }) {
           />
         ))}
         {lados.map((l, i) =>
-          l.pts.map((p) => <Circle key={`c${i}${p.dia}`} cx={x(p.dia)} cy={y(p.v)} r={4.5} fill="#FFFFFF" stroke={l.cor} strokeWidth={2.5} />),
+          l.pts.map((p) => <Circle key={`c${i}${p.dia}`} cx={x(p.dia)} cy={y(p.v)} r={4.5} fill={cores.cartao} stroke={l.cor} strokeWidth={2.5} />),
         )}
         <SvgTexto x={m.esq} y={altura - 8} fontSize={11} fill={cores.cinza}>
           {diaCurto(pontos[0].dia)}

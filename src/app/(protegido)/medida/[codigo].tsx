@@ -29,7 +29,7 @@ export default function DetalheMedida() {
   );
 
   const corDelta = (d: number | null) =>
-    !resumo || d == null ? cores.tinta : { bom: cores.verdeEscuro, ruim: '#8A4A14', neutro: cores.tinta }[tom(resumo.medida, d)];
+    !resumo || d == null ? cores.tinta : { bom: cores.verdeEscuro, ruim: cores.laranjaTexto, neutro: cores.tinta }[tom(resumo.medida, d)];
   const lista = resumo ? [...resumo.pontos].reverse() : [];
 
   return (

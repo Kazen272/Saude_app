@@ -114,7 +114,7 @@ export default function Hoje() {
 
         {erro && (
           <Cartao estilo={{ backgroundColor: cores.laranjaClaro }}>
-            <Text style={{ color: '#5C3410', fontSize: 14 }}>{erro}</Text>
+            <Text style={{ color: cores.laranjaTexto, fontSize: 14 }}>{erro}</Text>
           </Cartao>
         )}
 
@@ -154,7 +154,7 @@ export default function Hoje() {
                 {resumo.pesoAtual != null ? decimal(resumo.pesoAtual) : '—'}
                 <Text style={estilos.unidade}> kg</Text>
               </Text>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: cores.verde }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: cores.verdeTexto }}>
                 {resumo.variacaoSemanaKg == null
                   ? 'sem histórico ainda'
                   : resumo.variacaoSemanaKg <= 0
@@ -218,7 +218,7 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
   const avisoExcesso = plano && resumo.tarde && plano.podeComer > 0 && plano.deficitExcessivo;
 
   return (
-    <View style={{ backgroundColor: cores.tinta, borderRadius: 22, padding: 20, gap: 16 }}>
+    <View style={{ backgroundColor: cores.painel, borderRadius: 22, padding: 20, gap: 16 }}>
       <View style={{ gap: 4 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Calorias de hoje</Text>

@@ -7,7 +7,7 @@ import { formatarDuracao } from '@/lib/bemestar';
 import { carregarRelatorioSemanal, type RelatorioSemanal } from '@/lib/dados';
 import { decimal, diaCurto, milhar } from '@/lib/datas';
 import type { ItemComparacao, MetricasSemana } from '@/lib/relatorios';
-import { cores } from '@/lib/tema';
+import { cores, porTema } from '@/lib/tema';
 
 const NOMES: Record<keyof MetricasSemana, string> = {
   pesoMedioKg: 'Peso médio',
@@ -41,12 +41,12 @@ function formatar(chave: keyof MetricasSemana, v: number | null): string {
   }
 }
 
-const ESTILO_TENDENCIA = {
+const ESTILO_TENDENCIA = porTema(() => ({
   melhorou: { texto: 'melhorou', fundo: cores.verdeClaro, cor: cores.verdeEscuro, seta: '▲' },
-  piorou: { texto: 'piorou', fundo: cores.laranjaClaro, cor: '#8A4A14', seta: '▼' },
+  piorou: { texto: 'piorou', fundo: cores.laranjaClaro, cor: cores.laranjaTexto, seta: '▼' },
   estavel: { texto: 'estável', fundo: cores.linhaSuave, cor: cores.tintaSuave, seta: '=' },
   sem_dados: { texto: 'sem dados', fundo: cores.linhaSuave, cor: cores.cinza, seta: '·' },
-};
+}));
 
 export default function Relatorio() {
   const [dados, setDados] = useState<RelatorioSemanal | null>(null);
@@ -64,7 +64,7 @@ export default function Relatorio() {
     return (
       <View style={[estilos.conteudo]}>
         <Cartao estilo={{ backgroundColor: cores.laranjaClaro }}>
-          <Text style={{ color: '#5C3410' }}>{erro}</Text>
+          <Text style={{ color: cores.laranjaTexto }}>{erro}</Text>
         </Cartao>
       </View>
     );
@@ -88,7 +88,7 @@ export default function Relatorio() {
         {diaCurto(dados.semana.inicio)} a {diaCurto(dados.semana.fim)} · comparado com a semana anterior
       </Text>
 
-      <View style={{ backgroundColor: cores.tinta, borderRadius: 22, padding: 20, gap: 10 }}>
+      <View style={{ backgroundColor: cores.painel, borderRadius: 22, padding: 20, gap: 10 }}>
         <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Resumo</Text>
         <Text style={{ fontSize: 22, fontWeight: '800', color: '#FFFFFF' }}>
           {variacaoPeso == null
@@ -107,7 +107,7 @@ export default function Relatorio() {
 
       {dados.alertaDeficit && (
         <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 14, padding: 14 }}>
-          <Text style={{ fontSize: 14, color: '#5C3410' }}>
+          <Text style={{ fontSize: 14, color: cores.laranjaTexto }}>
             <Text style={{ fontWeight: '700' }}>Atenção: </Text>energia baixa e fome alta nos últimos check-ins. O déficit pode estar agressivo
             demais.
           </Text>

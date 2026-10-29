@@ -80,7 +80,7 @@ export default function Historico() {
           {r?.corpo && (
             <Link href="/registrar" asChild>
               <Pressable accessibilityRole="link" style={{ minHeight: 36, justifyContent: 'center' }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: cores.verde }}>editar</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: cores.verdeTexto }}>editar</Text>
               </Pressable>
             </Link>
           )}
@@ -142,7 +142,7 @@ export default function Historico() {
         {!sonoManual && !sonoRelogio && <Nota>Nenhuma noite registrada.</Nota>}
         <Link href="/sono" asChild>
           <Pressable accessibilityRole="link" style={{ minHeight: 40, justifyContent: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: cores.verde }}>{sonoManual ? 'corrigir na tela Sono' : 'registrar na tela Sono'}</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: cores.verdeTexto }}>{sonoManual ? 'corrigir na tela Sono' : 'registrar na tela Sono'}</Text>
           </Pressable>
         </Link>
       </Cartao>
@@ -174,7 +174,7 @@ function Linha({ texto, detalhe, aoApagar }: { texto: string; detalhe: string; a
           onPress={aoApagar}
           style={StyleSheet.flatten({ minHeight: 40, paddingHorizontal: 12, borderRadius: 10, justifyContent: 'center', backgroundColor: cores.laranjaClaro })}
         >
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#8A4A14' }}>Apagar</Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: cores.laranjaTexto }}>Apagar</Text>
         </Pressable>
       )}
     </View>

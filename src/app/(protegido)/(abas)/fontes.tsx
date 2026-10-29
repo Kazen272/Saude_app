@@ -1,13 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Link, type Href } from 'expo-router';
+import { Link, router, type Href } from 'expo-router';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CartaoHealthConnect } from '@/components/healthconnect';
 import { FormularioPerfil } from '@/components/perfil';
 import { Botao, Cabecalho, Cartao, estilos } from '@/components/ui';
+import { useAparencia } from '@/lib/aparencia';
 import { supabase } from '@/lib/supabase';
-import { cores } from '@/lib/tema';
+import { cores, type Esquema } from '@/lib/tema';
 
 export default function Fontes() {
   return (
@@ -22,6 +23,8 @@ export default function Fontes() {
             <ItemMenu href="/sono" icone="moon-outline" titulo="Sono" detalhe="registrar noites e ver a semana" />
             <ItemMenu href="/lembretes" icone="notifications-outline" titulo="Lembretes" detalhe="água, pesagem, check-in e os seus" ultimo />
           </Cartao>
+
+          <CartaoAparencia />
 
           <Text style={[estilos.rotulo, { marginTop: 6 }]}>Fontes de dados</Text>
 
@@ -66,5 +69,42 @@ function ItemMenu({
         <Ionicons name="chevron-forward" size={18} color={cores.cinza} />
       </Pressable>
     </Link>
+  );
+}
+
+function CartaoAparencia() {
+  const { esquema, definir } = useAparencia();
+  const escolher = (e: Esquema) => {
+    if (e === esquema) return;
+    definir(e);
+    // A troca remonta o app; volta para esta aba.
+    setTimeout(() => router.navigate('/fontes'), 50);
+  };
+  return (
+    <Cartao estilo={{ gap: 10 }}>
+      <Text style={estilos.rotulo}>Aparência</Text>
+      <View style={{ flexDirection: 'row', gap: 4, backgroundColor: cores.segmento, borderRadius: 12, padding: 4 }}>
+        {(
+          [
+            ['claro', 'Claro', 'sunny-outline'],
+            ['escuro', 'Escuro', 'moon-outline'],
+          ] as const
+        ).map(([e, nome, icone]) => {
+          const ativo = esquema === e;
+          return (
+            <Pressable
+              key={e}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: ativo }}
+              onPress={() => escolher(e)}
+              style={{ flex: 1, height: 44, borderRadius: 9, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? cores.cartao : 'transparent' }}
+            >
+              <Ionicons name={icone} size={18} color={ativo ? cores.tinta : cores.cinza} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: ativo ? cores.tinta : cores.cinza }}>{nome}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Cartao>
   );
 }

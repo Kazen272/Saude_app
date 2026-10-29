@@ -1,9 +1,9 @@
 import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
+import { ProvedorDeAparencia } from '@/lib/aparencia';
 import { ProvedorDeSessao } from '@/lib/sessao';
 
 const temNotificacoes = Platform.OS !== 'web';
@@ -35,9 +35,10 @@ function useAbrirTelaDoLembrete() {
 export default function LayoutRaiz() {
   useAbrirTelaDoLembrete();
   return (
-    <ProvedorDeSessao>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </ProvedorDeSessao>
+    <ProvedorDeAparencia>
+      <ProvedorDeSessao>
+        <Stack screenOptions={{ headerShown: false }} />
+      </ProvedorDeSessao>
+    </ProvedorDeAparencia>
   );
 }

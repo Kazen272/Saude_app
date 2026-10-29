@@ -139,7 +139,7 @@ export default function EditarLembrete() {
 
         <Cartao estilo={{ gap: 12 }}>
           <Text style={estilos.rotulo}>Quando</Text>
-          <View style={{ flexDirection: 'row', gap: 4, backgroundColor: '#E7EAE4', borderRadius: 12, padding: 4 }}>
+          <View style={{ flexDirection: 'row', gap: 4, backgroundColor: cores.segmento, borderRadius: 12, padding: 4 }}>
             {(
               [
                 ['horarios', 'Horários fixos'],

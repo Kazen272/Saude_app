@@ -109,7 +109,7 @@ export default function BoasVindas() {
 
           {passo > 0 && (
             <Pressable accessibilityRole="button" onPress={() => setPasso(passo - 1)} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: cores.verde }}>Voltar</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: cores.verdeTexto }}>Voltar</Text>
             </Pressable>
           )}
         </ScrollView>

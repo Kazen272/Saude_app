@@ -85,7 +85,7 @@ export default function Fotos() {
           titulo="Fotos de progresso"
         />
 
-        <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, backgroundColor: '#E7EAE4', borderRadius: 12, padding: 4 }}>
+        <View accessibilityRole="tablist" style={{ flexDirection: 'row', gap: 4, backgroundColor: cores.segmento, borderRadius: 12, padding: 4 }}>
           {POSES.map((p) => {
             const ativa = p.id === pose;
             return (
@@ -152,7 +152,7 @@ export default function Fotos() {
         </View>
 
         <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 14, padding: 14 }}>
-          <Text style={{ fontSize: 13, color: '#5C3410' }}>
+          <Text style={{ fontSize: 13, color: cores.laranjaTexto }}>
             <Text style={{ fontWeight: '700' }}>Dica: </Text>
             mesma luz, mesmo lugar e mesma hora, uma vez por semana. As fotos ficam numa pasta privada que só você acessa.
           </Text>
@@ -184,7 +184,7 @@ function Quadro({ titulo, foto, pesoKg, vazio, destaque = false }: { titulo: str
           height: 230,
           borderRadius: 12,
           overflow: 'hidden',
-          backgroundColor: destaque ? cores.verdeClaro : '#E9ECE6',
+          backgroundColor: destaque ? cores.verdeClaro : cores.segmento,
           alignItems: 'center',
           justifyContent: 'center',
           padding: 12,
@@ -224,7 +224,7 @@ function LinhaDado({ titulo, valor, ultima = false }: { titulo: string; valor: s
       }}
     >
       <Text style={{ fontSize: 14, color: cores.tintaSuave }}>{titulo}</Text>
-      <Text style={{ fontSize: 15, fontWeight: '800', color: cores.verde, fontVariant: ['tabular-nums'] }}>{valor}</Text>
+      <Text style={{ fontSize: 15, fontWeight: '800', color: cores.verdeTexto, fontVariant: ['tabular-nums'] }}>{valor}</Text>
     </View>
   );
 }

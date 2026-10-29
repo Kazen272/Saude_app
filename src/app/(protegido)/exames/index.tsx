@@ -38,7 +38,7 @@ export default function Exames() {
     <ScrollView contentContainerStyle={[estilos.conteudo, { paddingTop: 8 }]}>
       {erro && (
         <Cartao estilo={{ backgroundColor: cores.laranjaClaro }}>
-          <Text style={{ color: '#5C3410' }}>{erro}</Text>
+          <Text style={{ color: cores.laranjaTexto }}>{erro}</Text>
         </Cartao>
       )}
       {(ctx.idade == null || ctx.sexo == null) && exames && (

@@ -66,7 +66,7 @@ export default function Lembretes() {
     <ScrollView contentContainerStyle={[estilos.conteudo, { paddingTop: 8 }]}>
       {aviso && (
         <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 14, padding: 14 }}>
-          <Text style={{ fontSize: 14, color: '#5C3410' }}>{aviso}</Text>
+          <Text style={{ fontSize: 14, color: cores.laranjaTexto }}>{aviso}</Text>
         </View>
       )}
 
