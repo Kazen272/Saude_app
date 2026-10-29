@@ -5,6 +5,7 @@ import {
   gastoDiario,
   metaProteina,
   planoDoDia,
+  gastoTipicoRelogio,
   relacaoCinturaAltura,
   ritmoSemanal,
   idadeEmAnos,
@@ -229,8 +230,16 @@ function tmbDoPerfil(perfil: Perfil, pesoRefKg: number | null, hoje: string): nu
     : null;
 }
 
+/** Gasto total típico do relógio nos últimos 14 dias completos (null se não usa ou não há dados). */
+function tipicoDoRelogio(atividades: Atividade[], tmb: number | null, hoje: string): number | null {
+  if (tmb == null) return null;
+  const desde = somarDias(hoje, -14);
+  return gastoTipicoRelogio(atividades.filter((a) => a.day >= desde && a.day < hoje).map((a) => a.total_kcal), tmb);
+}
+
 function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades: Atividade[], hoje: string, ajusteKcal = 0) {
   const tmb = tmbDoPerfil(perfil, pesoRefKg, hoje);
+  const relogioEmUso = tipicoDoRelogio(atividades, tmb, hoje) != null;
   const agora = new Date();
   const fracaoHoje = fracaoDoDia(agora.getHours() * 60 + agora.getMinutes());
   return (dia: string) => {
@@ -243,6 +252,7 @@ function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades
       fatorAtividade: perfil.activity_factor,
       ajusteKcal,
       fracaoDoDia: dia === hoje ? fracaoHoje : 1,
+      confiarNoTotal: dia === hoje && relogioEmUso,
     });
   };
 }
@@ -451,6 +461,7 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
           ajusteKcal: analise.ajusteKcalDia,
           fracaoDoDia: fracaoDoDia(agora.getHours() * 60 + agora.getMinutes()),
           consumoKcal: balancoHoje.consumo,
+          gastoTipicoRelogio: tipicoDoRelogio(historico.atividades, tmb, hoje),
         });
 
   return {

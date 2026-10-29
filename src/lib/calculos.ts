@@ -39,6 +39,11 @@ export function gastoDiario(p: {
    * e o ajuste contam só até agora, igual às calorias do relógio e da dieta.
    */
   fracaoDoDia?: number;
+  /**
+   * O relógio costuma ser usado (há dias completos com total): o total de hoje
+   * vale mesmo abaixo do basal da fórmula, que pode superestimar a pessoa.
+   */
+  confiarNoTotal?: boolean;
 }): { kcal: number; origem: 'relogio' | 'estimativa' } {
   const f = Math.max(0, Math.min(1, p.fracaoDoDia ?? 1));
   const basal = p.tmb * f;
@@ -47,7 +52,7 @@ export function gastoDiario(p: {
     return { kcal: Math.round(basal + p.kcalAtivas + ajuste), origem: 'relogio' };
   }
   // Alguns relógios só informam o total; ele só vale se for maior que o basal.
-  if (p.kcalTotais != null && p.kcalTotais > basal) {
+  if (p.kcalTotais != null && p.kcalTotais > 0 && (p.confiarNoTotal || p.kcalTotais > basal)) {
     return { kcal: Math.round(p.kcalTotais + ajuste), origem: 'relogio' };
   }
   return { kcal: Math.round(basal * p.fatorAtividade + ajuste), origem: 'estimativa' };
@@ -56,6 +61,17 @@ export function gastoDiario(p: {
 /** Fração do dia já decorrida num horário local (minutos desde 0h). */
 export function fracaoDoDia(minutosDesdeMeiaNoite: number): number {
   return Math.max(0, Math.min(1, minutosDesdeMeiaNoite / 1440));
+}
+
+/**
+ * Gasto total típico de um dia completo pelo relógio: mediana dos dias em que
+ * ele foi usado (total de pelo menos 60% do basal). Precisa de 2 dias ou mais.
+ */
+export function gastoTipicoRelogio(totais: (number | null | undefined)[], tmb: number): number | null {
+  const v = totais.filter((t): t is number => t != null && t >= tmb * 0.6).sort((a, b) => a - b);
+  if (v.length < 2) return null;
+  const meio = Math.floor(v.length / 2);
+  return Math.round(v.length % 2 ? v[meio] : (v[meio - 1] + v[meio]) / 2);
 }
 
 export type PlanoDoDia = {
@@ -83,13 +99,20 @@ export function planoDoDia(p: {
   ajusteKcal?: number;
   fracaoDoDia: number;
   consumoKcal: number | null;
+  /** Gasto total típico de um dia completo segundo o relógio (mediana recente). */
+  gastoTipicoRelogio?: number | null;
 }): PlanoDoDia {
+  const tipico = p.gastoTipicoRelogio != null && p.gastoTipicoRelogio > 0 ? p.gastoTipicoRelogio : null;
   const f = Math.max(0, Math.min(1, p.fracaoDoDia));
   const ajuste = p.ajusteKcal ?? 0;
   let gasto: number;
   if (p.kcalAtivas != null && p.kcalAtivas > 0) gasto = p.tmb + p.kcalAtivas + ajuste;
-  else if (p.kcalTotais != null && p.kcalTotais > p.tmb * f) gasto = p.kcalTotais + p.tmb * (1 - f) + ajuste;
+  else if (p.kcalTotais != null && p.kcalTotais > 0 && (tipico != null || p.kcalTotais > p.tmb * f))
+    // Resto do dia no ritmo do próprio relógio, quando há histórico dele.
+    gasto = p.kcalTotais + (tipico ?? p.tmb) * (1 - f) + ajuste;
   else gasto = p.tmb * p.fatorAtividade + ajuste;
+  // Entre a fórmula e o relógio, vale o menor: errar para menos nunca manda comer demais.
+  if (tipico != null) gasto = Math.min(gasto, tipico + ajuste);
   const gastoPrevisto = Math.round(gasto);
   const metaDeficit = Math.min(500, Math.round((gastoPrevisto * 0.2) / 50) * 50);
   const consumo = p.consumoKcal ?? 0;

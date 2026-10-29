@@ -7,6 +7,7 @@ import {
   fracaoDoDia,
   metaProteina,
   planoDoDia,
+  gastoTipicoRelogio,
   relacaoCinturaAltura,
   ritmoSemanal,
   ajusteDeGasto,
@@ -172,5 +173,25 @@ describe('planoDoDia', () => {
     const p = planoDoDia({ tmb: 1600, kcalTotais: 1000, fatorAtividade: 1.2, fracaoDoDia: 0.5, consumoKcal: null });
     assert.equal(p.gastoPrevisto, 1800);
     assert.equal(p.podeComer, 1450);
+  });
+});
+
+describe('relógio abaixo da fórmula', () => {
+  it('gasto típico: mediana dos dias com o relógio no pulso', () => {
+    assert.equal(gastoTipicoRelogio([1857, 2112, 400, null], 2050), 1985);
+    assert.equal(gastoTipicoRelogio([1857], 2050), null);
+  });
+  it('com histórico do relógio, o total de hoje vale mesmo abaixo do basal da fórmula', () => {
+    const f = 750 / 1440;
+    assert.equal(gastoDiario({ tmb: 2050, kcalTotais: 815, fatorAtividade: 1.55, fracaoDoDia: f, confiarNoTotal: true }).kcal, 815);
+    assert.equal(gastoDiario({ tmb: 2050, kcalTotais: 815, fatorAtividade: 1.55, fracaoDoDia: f }).origem, 'estimativa');
+  });
+  it('plano usa o menor entre fórmula e relógio', () => {
+    const p = planoDoDia({ tmb: 2050, kcalTotais: 815, fatorAtividade: 1.55, fracaoDoDia: 750 / 1440, consumoKcal: 348, gastoTipicoRelogio: 1985 });
+    assert.equal(p.gastoPrevisto, 1766); // 815 até agora + resto do dia no ritmo do relógio
+    assert.equal(p.metaDeficit, 350);
+    assert.equal(p.podeComer, 1068);
+    // Sem o total de hoje, o relógio limita a estimativa pelo fator (2050 × 1,55).
+    assert.equal(planoDoDia({ tmb: 2050, fatorAtividade: 1.55, fracaoDoDia: 0.5, consumoKcal: 0, gastoTipicoRelogio: 1985 }).gastoPrevisto, 1985);
   });
 });
