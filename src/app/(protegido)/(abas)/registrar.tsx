@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Botao, Cabecalho, Campo, Cartao, LinhaCampos, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
 import { mediaMovel } from '@/lib/calculos';
-import { carregarPesagens, carregarRegistrosDoDia, registrarAgua, registrarCorpo } from '@/lib/dados';
+import { carregarMedidas, carregarPesagens, carregarRegistrosDoDia, registrarAgua, registrarCorpo } from '@/lib/dados';
+import { COLUNAS, COLUNAS_EXTRAS, MEDIDAS, ultimosValores, type Coluna, type Grupo, type Valores } from '@/lib/medidas';
 import { decimal, diaLocal } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
@@ -24,9 +25,9 @@ export default function Registrar() {
   const [peso, setPeso] = useState(''); // texto: a pessoa pode digitar direto
   const [referencia, setReferencia] = useState<{ ultimo: number | null; media: number | null }>({ ultimo: null, media: null });
   const [jaTinha, setJaTinha] = useState(false);
-  const [cintura, setCintura] = useState('');
-  const [quadril, setQuadril] = useState('');
-  const [gordura, setGordura] = useState('');
+  const [medidas, setMedidas] = useState<Record<Coluna, string>>(vazias());
+  const [ultimas, setUltimas] = useState<Valores>({});
+  const [maisAberto, setMaisAberto] = useState(false);
   const [aguaSessao, setAguaSessao] = useState(0);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'erro' | 'ok'; texto: string } | null>(null);
@@ -35,16 +36,17 @@ export default function Registrar() {
     setMensagem(null);
     setAguaSessao(0);
     try {
-      const [pesagens, registros] = await Promise.all([carregarPesagens(30), carregarRegistrosDoDia(d)]);
+      const [pesagens, registros, historicoMedidas] = await Promise.all([carregarPesagens(30), carregarRegistrosDoDia(d), carregarMedidas()]);
       const anteriores = pesagens.filter((p) => p.dia < d);
       setReferencia({ ultimo: anteriores.at(-1)?.pesoKg ?? null, media: mediaMovel(anteriores).at(-1)?.pesoKg ?? null });
       const c = registros.corpo;
       setJaTinha(c?.pesoKg != null);
       // Sem pesagem no dia: começa do último peso (é só ajustar 0,1) ou vazio na primeira vez.
       setPeso(paraTexto(c?.pesoKg ?? anteriores.at(-1)?.pesoKg ?? null));
-      setCintura(paraTexto(c?.cinturaCm));
-      setQuadril(paraTexto(c?.quadrilCm));
-      setGordura(paraTexto(c?.gorduraPct));
+      // Todas as medidas do dia entram no formulário: salvar não apaga o que já existia.
+      setMedidas(Object.fromEntries(COLUNAS.map((col) => [col, paraTexto(c?.medidas[col])])) as Record<Coluna, string>);
+      setUltimas(ultimosValores(historicoMedidas, d));
+      setMaisAberto(COLUNAS_EXTRAS.some((col) => c?.medidas[col] != null));
     } catch (e) {
       setMensagem({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Erro ao carregar.' });
     }
@@ -76,22 +78,22 @@ export default function Registrar() {
   async function salvar() {
     setMensagem(null);
     const pesoKg = lerNumero(peso);
-    const medidas = { cintura: lerNumero(cintura), quadril: lerNumero(quadril), gordura: lerNumero(gordura) };
+    const valores = Object.fromEntries(COLUNAS.map((c) => [c, lerNumero(medidas[c])])) as Record<Coluna, number | null>;
     if (pesoKg != null && (Number.isNaN(pesoKg) || pesoKg < 20 || pesoKg > 400)) {
       setMensagem({ tipo: 'erro', texto: 'Peso em kg, como 88,6.' });
       return;
     }
-    if (Object.values(medidas).some((v) => Number.isNaN(v))) {
+    if (Object.values(valores).some((v) => Number.isNaN(v))) {
       setMensagem({ tipo: 'erro', texto: 'Confira as medidas: use só números, como 92,5.' });
       return;
     }
-    if (pesoKg == null && medidas.cintura == null && medidas.quadril == null && medidas.gordura == null) {
+    if (pesoKg == null && Object.values(valores).every((v) => v == null)) {
       setMensagem({ tipo: 'erro', texto: 'Digite o peso ou alguma medida.' });
       return;
     }
     setSalvando(true);
     try {
-      await registrarCorpo({ dia, pesoKg, cinturaCm: medidas.cintura, quadrilCm: medidas.quadril, gorduraPct: medidas.gordura });
+      await registrarCorpo({ dia, pesoKg, medidas: valores });
       setJaTinha(pesoKg != null);
       setMensagem({ tipo: 'ok', texto: 'Registro salvo. Projeção atualizada.' });
     } catch (e) {
@@ -102,6 +104,9 @@ export default function Registrar() {
   }
 
   const ehHoje = dia === diaLocal();
+  const mudarMedida = (col: Coluna, t: string) => setMedidas((m) => ({ ...m, [col]: t.replace(/[^\d,.]/g, '').slice(0, 5) }));
+  const extrasPreenchidas = COLUNAS_EXTRAS.filter((c) => medidas[c].trim() !== '').length;
+  const temUltimas = Object.keys(ultimas).length > 0;
 
   return (
     <SafeAreaView style={estilos.tela} edges={['top']}>
@@ -154,14 +159,65 @@ export default function Registrar() {
 
           <Cartao estilo={{ gap: 12 }}>
             <Rotulo>
-              Medidas <Text style={{ fontWeight: '500', color: cores.cinza }}>(opcional, 1× por semana)</Text>
+              Medidas em cm <Text style={{ fontWeight: '500', color: cores.cinza }}>(opcional, 1× por semana)</Text>
             </Rotulo>
             <LinhaCampos>
-              <Campo rotulo="Cintura (cm)" value={cintura} onChangeText={setCintura} keyboardType="decimal-pad" />
-              <Campo rotulo="Quadril (cm)" value={quadril} onChangeText={setQuadril} keyboardType="decimal-pad" />
-              <Campo rotulo="% gordura" value={gordura} onChangeText={setGordura} keyboardType="decimal-pad" />
+              <CampoMedida coluna="waist_cm" rotulo="Cintura" medidas={medidas} ultimas={ultimas} aoMudar={mudarMedida} />
+              <CampoMedida coluna="hip_cm" rotulo="Quadril" medidas={medidas} ultimas={ultimas} aoMudar={mudarMedida} />
             </LinhaCampos>
-            <Nota>Meça a cintura na altura do umbigo, sem apertar a fita.</Nota>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: maisAberto }}
+              onPress={() => setMaisAberto((v) => !v)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, backgroundColor: cores.verdeClaro }}
+            >
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: cores.verdeEscuro }}>{maisAberto ? 'Menos medidas' : 'Mais medidas'}</Text>
+                {!maisAberto && (
+                  <Text style={{ fontSize: 12, color: cores.tintaSuave }}>
+                    {extrasPreenchidas > 0 ? `${extrasPreenchidas} preenchida${extrasPreenchidas === 1 ? '' : 's'} neste dia` : 'ombro, tórax, abdômen, braços e pernas'}
+                  </Text>
+                )}
+              </View>
+              <Text style={{ fontSize: 12, color: cores.verdeEscuro }}>{maisAberto ? '▲' : '▼'}</Text>
+            </Pressable>
+            {maisAberto && (
+              <View style={{ gap: 14 }}>
+                <TituloGrupo texto="Tronco" />
+                <LinhaCampos>
+                  <CampoMedida coluna="shoulder_cm" rotulo="Ombro" medidas={medidas} ultimas={ultimas} aoMudar={mudarMedida} />
+                  <CampoMedida coluna="chest_cm" rotulo="Tórax" medidas={medidas} ultimas={ultimas} aoMudar={mudarMedida} />
+                  <CampoMedida coluna="abdomen_cm" rotulo="Abdômen" medidas={medidas} ultimas={ultimas} aoMudar={mudarMedida} />
+                </LinhaCampos>
+                {(['bracos', 'pernas'] as Grupo[]).map((grupo) => (
+                  <View key={grupo} style={{ gap: 8 }}>
+                    <TituloGrupo texto={grupo === 'bracos' ? 'Braços' : 'Pernas'} lados />
+                    {MEDIDAS.filter((m) => m.grupo === grupo).map((m) => (
+                      <View key={m.codigo} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: cores.tinta }} numberOfLines={2}>
+                          {m.nome.replace(/^Braço /, '').replace(/^./, (l) => l.toUpperCase())}
+                        </Text>
+                        {m.colunas.map((col, i) => (
+                          <TextInput
+                            key={col}
+                            accessibilityLabel={`${m.nome} ${i === 0 ? 'esquerdo' : 'direito'}`}
+                            value={medidas[col]}
+                            onChangeText={(t) => mudarMedida(col, t)}
+                            placeholder={ultimas[col] != null ? decimal(ultimas[col] as number, Number.isInteger(ultimas[col]) ? 0 : 1) : ''}
+                            placeholderTextColor={COR_ULTIMA}
+                            keyboardType="decimal-pad"
+                            style={[estilos.campo, { width: 84, paddingHorizontal: 4, textAlign: 'center' }]}
+                          />
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            )}
+            <Nota>
+              {temUltimas ? 'Em cinza, a última medida. ' : ''}Deixe em branco o que não mediu. Cintura na altura do umbigo, sem apertar a fita. Avaliação da academia: escolha no topo o dia em que ela foi feita.
+            </Nota>
           </Cartao>
 
           {mensagem && (
@@ -205,6 +261,53 @@ export default function Registrar() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+const COR_ULTIMA = '#8A938D';
+
+function vazias(): Record<Coluna, string> {
+  return Object.fromEntries(COLUNAS.map((c) => [c, ''])) as Record<Coluna, string>;
+}
+
+function CampoMedida({
+  coluna,
+  rotulo,
+  medidas,
+  ultimas,
+  aoMudar,
+}: {
+  coluna: Coluna;
+  rotulo: string;
+  medidas: Record<Coluna, string>;
+  ultimas: Valores;
+  aoMudar: (c: Coluna, t: string) => void;
+}) {
+  const ultima = ultimas[coluna];
+  return (
+    <Campo
+      rotulo={rotulo}
+      value={medidas[coluna]}
+      onChangeText={(t) => aoMudar(coluna, t)}
+      keyboardType="decimal-pad"
+      placeholder={ultima != null ? decimal(ultima, Number.isInteger(ultima) ? 0 : 1) : ''}
+      placeholderTextColor={COR_ULTIMA}
+    />
+  );
+}
+
+function TituloGrupo({ texto, lados = false }: { texto: string; lados?: boolean }) {
+  const estilo = { fontSize: 12, fontWeight: '800' as const, color: cores.cinza, letterSpacing: 0.5, textTransform: 'uppercase' as const };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 4 }}>
+      <Text style={[estilo, { flex: 1 }]}>{texto}</Text>
+      {lados && (
+        <>
+          <Text style={[estilo, { width: 84, textAlign: 'center', letterSpacing: 0 }]}>Esq.</Text>
+          <Text style={[estilo, { width: 84, textAlign: 'center', letterSpacing: 0 }]}>Dir.</Text>
+        </>
+      )}
+    </View>
   );
 }
 

@@ -48,6 +48,7 @@ preciso gerar um APK novo.
 
 - [x] Banco, login e regras de acesso
 - [x] Registro de peso, medidas e água
+- [x] Perimetria: cintura e quadril + 13 medidas da avaliação (tronco, braços e pernas, esquerdo/direito), com evolução por medida
 - [x] Cálculos: metabolismo basal, gasto, déficit, média móvel, projeção, recalibração
 - [x] Leitura do Health Connect: passos, calorias, FC de repouso, sono, treinos, nutrição e peso (últimos 28 dias)
 - [ ] Dieta do FatSecret: entra pelo Health Connect se o FatSecret gravar nutrição lá (a confirmar no celular)

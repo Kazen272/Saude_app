@@ -7,7 +7,10 @@ import { Cartao, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
 import { salvarCheckin } from '@/lib/bemestar-dados';
 import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, type RegistrosDoDia } from '@/lib/dados';
 import { decimal, diaLocal, nomeDoDia, numeroCurto } from '@/lib/datas';
+import { COLUNAS_EXTRAS, type Valores } from '@/lib/medidas';
 import { cores } from '@/lib/tema';
+
+const extras = (v: Valores) => COLUNAS_EXTRAS.filter((c) => v[c] != null).length;
 
 export default function Historico() {
   const params = useLocalSearchParams<{ dia?: string }>();
@@ -86,9 +89,9 @@ export default function Historico() {
           <Linha
             texto={[
               r.corpo.pesoKg != null ? `${decimal(r.corpo.pesoKg)} kg` : null,
-              r.corpo.cinturaCm != null ? `cintura ${decimal(r.corpo.cinturaCm, 0)} cm` : null,
-              r.corpo.quadrilCm != null ? `quadril ${decimal(r.corpo.quadrilCm, 0)} cm` : null,
-              r.corpo.gorduraPct != null ? `${decimal(r.corpo.gorduraPct)}% gordura` : null,
+              r.corpo.medidas.waist_cm != null ? `cintura ${numeroCurto(r.corpo.medidas.waist_cm, 1)} cm` : null,
+              r.corpo.medidas.hip_cm != null ? `quadril ${numeroCurto(r.corpo.medidas.hip_cm, 1)} cm` : null,
+              extras(r.corpo.medidas) > 0 ? `+${extras(r.corpo.medidas)} medida${extras(r.corpo.medidas) === 1 ? '' : 's'}` : null,
             ]
               .filter(Boolean)
               .join(' · ')}

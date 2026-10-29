@@ -29,6 +29,7 @@ import {
   type PrevistoReal,
   type ResumoPeriodo,
 } from './relatorios';
+import { COLUNAS, MEDIDAS, resumir, type RegistroMedidas, type ResumoMedida, type Valores } from './medidas';
 import { supabase } from './supabase';
 
 export type Perfil = {
@@ -116,7 +117,7 @@ export async function apagarAgua(id: number): Promise<void> {
 }
 
 export type RegistrosDoDia = {
-  corpo: { pesoKg: number | null; cinturaCm: number | null; quadrilCm: number | null; gorduraPct: number | null; origem: string } | null;
+  corpo: { pesoKg: number | null; medidas: Valores; origem: string } | null;
   agua: { id: number; ml: number; hora: string }[];
   sono: { origem: string; deitou: string; acordou: string; qualidade: number | null }[];
   checkin: { energia: number | null; fome: number | null; humor: number | null } | null;
@@ -132,20 +133,19 @@ export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDi
   const [a, m, d] = dia.split('-').map(Number);
   const { inicio, fim } = limitesDoDia(new Date(a, m - 1, d));
   const [corpo, agua, sono, checkin] = await Promise.all([
-    supabase.from('body_entries').select('weight_kg, waist_cm, hip_cm, body_fat_pct, source').eq('measured_on', dia).maybeSingle(),
+    supabase.from('body_entries').select(`weight_kg, source, ${COLUNAS.join(', ')}`).eq('measured_on', dia).maybeSingle(),
     supabase.from('water_entries').select('id, amount_ml, logged_at').gte('logged_at', inicio).lt('logged_at', fim).order('logged_at'),
     supabase.from('sleep_sessions').select('bed_at, wake_at, quality, source').eq('night', dia),
     supabase.from('daily_checkins').select('energy, hunger, mood').eq('day', dia).maybeSingle(),
   ]);
   for (const r of [corpo, agua, sono, checkin]) if (r.error) throw r.error;
+  const corpoLinha = corpo.data as unknown as Record<string, unknown> | null;
   return {
-    corpo: corpo.data
+    corpo: corpoLinha
       ? {
-          pesoKg: num(corpo.data.weight_kg),
-          cinturaCm: num(corpo.data.waist_cm),
-          quadrilCm: num(corpo.data.hip_cm),
-          gorduraPct: num(corpo.data.body_fat_pct),
-          origem: corpo.data.source as string,
+          pesoKg: num(corpoLinha.weight_kg as number | null),
+          medidas: lerValores(corpoLinha),
+          origem: corpoLinha.source as string,
         }
       : null,
     agua: (agua.data ?? []).map((x) => ({ id: x.id as number, ml: Number(x.amount_ml), hora: hhmm(x.logged_at as string) })),
@@ -173,17 +173,14 @@ export async function apagarSonoManual(dia: string): Promise<void> {
 export async function registrarCorpo(entrada: {
   dia: string;
   pesoKg: number | null;
-  cinturaCm?: number | null;
-  quadrilCm?: number | null;
-  gorduraPct?: number | null;
+  /** Ausente = não mexe nas medidas do dia (ex.: só o peso, no primeiro acesso). */
+  medidas?: Valores;
 }): Promise<void> {
   // O formulário já vem preenchido com o que existe no dia: campo apagado = valor apagado.
   const linha: Record<string, unknown> = {
     measured_on: entrada.dia,
     weight_kg: entrada.pesoKg,
-    waist_cm: entrada.cinturaCm ?? null,
-    hip_cm: entrada.quadrilCm ?? null,
-    body_fat_pct: entrada.gorduraPct ?? null,
+    ...(entrada.medidas ? Object.fromEntries(COLUNAS.map((c) => [c, entrada.medidas?.[c] ?? null])) : {}),
     source: 'manual',
   };
   const { data: sessao } = await supabase.auth.getUser();
@@ -327,7 +324,9 @@ export type Progresso = {
   ritmo: { kgPorSemana: number; pctPorSemana: number } | null;
   proteinaMediaSemana: number | null;
   metaProteina: { min: number; max: number } | null;
-  cintura: { atual: number; dia: string; inicial: number; diaInicial: string; relacao: { valor: number; nivel: NivelCintura } | null } | null;
+  /** Só as medidas que já foram registradas alguma vez. */
+  medidas: ResumoMedida[];
+  relacaoCintura: { valor: number; nivel: NivelCintura } | null;
   /** 8 semanas (seg–dom), da mais antiga para a atual. */
   tendencias: { semana: string; passos: number | null; fcRepouso: number | null; treinos: number }[];
 };
@@ -341,7 +340,7 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
 
   const inicio56 = somarDias(hoje, -62);
   const [a56, m56, d56] = inicio56.split('-').map(Number);
-  const [perfil, pesagensTodas, historico, treinos, agua, atividade56, treinos56, cinturas] = await Promise.all([
+  const [perfil, pesagensTodas, historico, treinos, agua, atividade56, treinos56, registrosMedidas] = await Promise.all([
     carregarPerfil(),
     carregarPesagens(Math.max(periodoDias, 28) + 7),
     carregarHistorico28(hoje),
@@ -349,9 +348,9 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
     supabase.from('water_entries').select('amount_ml').gte('logged_at', limites7.inicio).lt('logged_at', limites7.fim),
     supabase.from('daily_activity').select('day, steps, resting_hr').gte('day', inicio56),
     supabase.from('workouts').select('started_at').gte('started_at', new Date(a56, m56 - 1, d56).toISOString()),
-    supabase.from('body_entries').select('measured_on, waist_cm').not('waist_cm', 'is', null).order('measured_on'),
+    carregarMedidas(),
   ]);
-  for (const r of [treinos, agua, atividade56, treinos56, cinturas]) if (r.error) throw r.error;
+  for (const r of [treinos, agua, atividade56, treinos56]) if (r.error) throw r.error;
 
   // Tendências semanais do relógio e dos treinos
   const ativ = (atividade56.data ?? []) as { day: string; steps: number | null; resting_hr: number | null }[];
@@ -366,18 +365,10 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
     treinos: semanasTreinos[i].valores.length,
   }));
 
-  // Cintura: primeira e última medida, e relação com a altura
-  const listaCintura = ((cinturas.data ?? []) as { measured_on: string; waist_cm: number | string }[]).map((c) => ({ dia: c.measured_on, cm: Number(c.waist_cm) }));
-  const ultimaCintura = listaCintura.at(-1);
-  const cintura = ultimaCintura
-    ? {
-        atual: ultimaCintura.cm,
-        dia: ultimaCintura.dia,
-        inicial: listaCintura[0].cm,
-        diaInicial: listaCintura[0].dia,
-        relacao: perfil.height_cm ? relacaoCinturaAltura(ultimaCintura.cm, perfil.height_cm) : null,
-      }
-    : null;
+  // Perimetria: evolução de cada medida e relação cintura ÷ altura
+  const medidas = MEDIDAS.map((m) => resumir(registrosMedidas, m)).filter((r): r is ResumoMedida => r != null);
+  const cinturaAtual = medidas.find((r) => r.medida.codigo === 'cintura')?.atual.valores[0] ?? null;
+  const relacaoCintura = cinturaAtual != null && perfil.height_cm ? relacaoCinturaAltura(cinturaAtual, perfil.height_cm) : null;
 
   const analise = analisar({ perfil, pesagens: pesagensTodas, ...historico, hoje });
   const inicioPeriodo = somarDias(hoje, -(periodoDias - 1));
@@ -393,7 +384,8 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
     ritmo: ritmoSemanal(analise.medias),
     proteinaMediaSemana: proteinas.length ? Math.round(proteinas.reduce((s, x) => s + x, 0) / proteinas.length) : null,
     metaProteina: analise.pesoRef != null ? metaProteina(analise.pesoRef) : null,
-    cintura,
+    medidas,
+    relacaoCintura,
     tendencias,
     perfil,
     perfilCompleto: perfilEstaCompleto(perfil),
@@ -528,4 +520,19 @@ export async function carregarRelatorioSemanal(): Promise<RelatorioSemanal> {
     noitesAbaixoDe7h: resumirSono(noites.filter((n) => n.dia >= semana.inicio && n.dia <= semana.fim)).abaixoDe7h,
     diasComCheckin: checkinsSemana.length,
   };
+}
+
+function lerValores(linha: Record<string, unknown>): Valores {
+  const out: Valores = {};
+  for (const c of COLUNAS) out[c] = linha[c] == null ? null : Number(linha[c]);
+  return out;
+}
+
+/** Todos os dias com alguma medida de fita (cintura, braço…), do mais antigo ao mais novo. */
+export async function carregarMedidas(): Promise<RegistroMedidas[]> {
+  const { data, error } = await supabase.from('body_entries').select(`measured_on, ${COLUNAS.join(', ')}`).order('measured_on');
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[])
+    .map((r) => ({ dia: r.measured_on as string, valores: lerValores(r) }))
+    .filter((r) => Object.values(r.valores).some((v) => v != null));
 }

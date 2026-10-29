@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradeCheckins, GraficoSono } from '@/components/bemestar';
 import { GraficoDeficit, GraficoPeso, GraficoSemanas } from '@/components/graficos';
+import { CartaoMedidas } from '@/components/medidas';
 import { Cabecalho, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import { LIMITE_RITMO_PCT } from '@/lib/calculos';
 import { formatarDuracao, mediaCampo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
@@ -204,7 +205,7 @@ export default function Progresso() {
         </Cartao>
 
         {/* Medidas */}
-        <CartaoMedidas dados={dados} />
+        <CartaoMedidas medidas={dados?.medidas ?? null} relacaoCintura={dados?.relacaoCintura ?? null} temAltura={!!dados?.perfil.height_cm} />
 
         {/* Tendências de 8 semanas */}
         <Cartao estilo={{ gap: 14 }}>
@@ -268,54 +269,6 @@ function TextoProjecao({ dados }: { dados: DadosProgresso }) {
   if (p?.estado === 'sem_deficit') texto = 'Sem déficit nos últimos 14 dias: no ritmo atual, o peso não deve cair.';
   if (p?.estado === 'atingida') texto = 'Meta atingida. Defina uma nova no perfil, na aba Mais.';
   return <Nota>{texto}</Nota>;
-}
-
-const NIVEL_CINTURA = {
-  adequado: { texto: 'adequada', cor: cores.verdeEscuro, fundo: cores.verdeClaro },
-  atencao: { texto: 'atenção', cor: '#8A4A14', fundo: cores.laranjaClaro },
-  alto: { texto: 'alta', cor: '#8A1F1F', fundo: '#F6DCDC' },
-};
-
-function CartaoMedidas({ dados }: { dados: DadosProgresso | null }) {
-  const c = dados?.cintura;
-  if (!c) {
-    return (
-      <Cartao estilo={{ gap: 4 }}>
-        <Rotulo>Cintura</Rotulo>
-        <Nota>Registre a cintura 1 vez por semana na aba Registrar. Ela mostra a perda de gordura abdominal melhor que o peso.</Nota>
-      </Cartao>
-    );
-  }
-  const variacao = c.atual - c.inicial;
-  const n = c.relacao ? NIVEL_CINTURA[c.relacao.nivel] : null;
-  return (
-    <Cartao estilo={{ gap: 10 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
-        <View style={{ gap: 2 }}>
-          <Rotulo>Cintura</Rotulo>
-          <Text style={{ fontSize: 28, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>{decimal(c.atual, c.atual % 1 ? 1 : 0)} cm</Text>
-        </View>
-        <Text style={{ fontSize: 13, color: cores.cinza, textAlign: 'right', flexShrink: 1 }}>
-          {c.dia === c.diaInicial
-            ? `medida em ${diaCurto(c.dia)}`
-            : Math.abs(variacao) < 0.05
-              ? `igual desde ${diaCurto(c.diaInicial)}`
-              : `${variacao < 0 ? '−' : '+'}${decimal(Math.abs(variacao), Math.abs(variacao) % 1 ? 1 : 0)} cm desde ${diaCurto(c.diaInicial)}`}
-        </Text>
-      </View>
-      {c.relacao && n ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <Text style={{ fontSize: 14, color: cores.tintaSuave }}>Cintura ÷ altura: {decimal(c.relacao.valor, 2)}</Text>
-          <View style={{ backgroundColor: n.fundo, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
-            <Text style={{ fontSize: 12, fontWeight: '800', color: n.cor }}>{n.texto}</Text>
-          </View>
-        </View>
-      ) : (
-        <Nota>Preencha a altura no perfil para ver a relação cintura ÷ altura.</Nota>
-      )}
-      <Nota>Abaixo de 0,5 é considerado adequado; de 0,5 a 0,6 pede atenção; acima de 0,6 indica mais gordura abdominal. É uma referência geral, não um diagnóstico.</Nota>
-    </Cartao>
-  );
 }
 
 function textoPrevistoReal(dados: DadosProgresso | null): string {
