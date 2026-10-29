@@ -6,6 +6,7 @@ import {
   aguaSugeridaMl,
   fracaoDoDia,
   metaProteina,
+  planoDoDia,
   relacaoCinturaAltura,
   ritmoSemanal,
   ajusteDeGasto,
@@ -148,5 +149,28 @@ describe('ritmo, proteína, água e cintura', () => {
     assert.deepEqual(relacaoCinturaAltura(96, 178), { valor: 0.54, nivel: 'atencao' });
     assert.equal(relacaoCinturaAltura(85, 178).nivel, 'adequado');
     assert.equal(relacaoCinturaAltura(110, 178).nivel, 'alto');
+  });
+});
+
+describe('planoDoDia', () => {
+  it('com relógio: basal do dia inteiro + ativas até agora, sem contar atividade futura', () => {
+    const p = planoDoDia({ tmb: 1400, kcalAtivas: 150, fatorAtividade: 1.375, fracaoDoDia: 0.5, consumoKcal: 392 });
+    assert.equal(p.gastoPrevisto, 1550);
+    assert.equal(p.metaDeficit, 300); // 20% de 1550, arredondado a 50
+    assert.equal(p.podeComer, 858);
+    assert.equal(p.deficitSeParar, 1158);
+    assert.equal(p.deficitExcessivo, true);
+  });
+  it('sem relógio: estimativa pelo fator; meta limitada a 500', () => {
+    const p = planoDoDia({ tmb: 1900, fatorAtividade: 1.55, fracaoDoDia: 0.8, consumoKcal: 2600 });
+    assert.equal(p.gastoPrevisto, 2945);
+    assert.equal(p.metaDeficit, 500);
+    assert.equal(p.podeComer, -155);
+    assert.equal(p.deficitExcessivo, false);
+  });
+  it('só com o total do relógio: completa o basal do resto do dia', () => {
+    const p = planoDoDia({ tmb: 1600, kcalTotais: 1000, fatorAtividade: 1.2, fracaoDoDia: 0.5, consumoKcal: null });
+    assert.equal(p.gastoPrevisto, 1800);
+    assert.equal(p.podeComer, 1450);
   });
 });

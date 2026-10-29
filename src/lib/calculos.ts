@@ -58,6 +58,51 @@ export function fracaoDoDia(minutosDesdeMeiaNoite: number): number {
   return Math.max(0, Math.min(1, minutosDesdeMeiaNoite / 1440));
 }
 
+export type PlanoDoDia = {
+  /** Gasto previsto até a meia-noite, sem contar atividade que ainda não aconteceu. */
+  gastoPrevisto: number;
+  /** Déficit sugerido para o dia: 500 kcal, ou 20% do gasto se for menor. */
+  metaDeficit: number;
+  /** Quanto ainda dá para comer e fechar o dia na meta (negativo = já passou). */
+  podeComer: number;
+  /** Déficit com que o dia fecharia se a pessoa não comesse mais nada. */
+  deficitSeParar: number;
+  /** Se parar agora, o déficit fica grande demais. */
+  deficitExcessivo: boolean;
+};
+
+/**
+ * Plano do dia de hoje. É conservador: a atividade que o relógio ainda vai medir
+ * não entra, então a pessoa nunca é incentivada a comer contando com um treino futuro.
+ */
+export function planoDoDia(p: {
+  tmb: number;
+  kcalAtivas?: number | null;
+  kcalTotais?: number | null;
+  fatorAtividade: number;
+  ajusteKcal?: number;
+  fracaoDoDia: number;
+  consumoKcal: number | null;
+}): PlanoDoDia {
+  const f = Math.max(0, Math.min(1, p.fracaoDoDia));
+  const ajuste = p.ajusteKcal ?? 0;
+  let gasto: number;
+  if (p.kcalAtivas != null && p.kcalAtivas > 0) gasto = p.tmb + p.kcalAtivas + ajuste;
+  else if (p.kcalTotais != null && p.kcalTotais > p.tmb * f) gasto = p.kcalTotais + p.tmb * (1 - f) + ajuste;
+  else gasto = p.tmb * p.fatorAtividade + ajuste;
+  const gastoPrevisto = Math.round(gasto);
+  const metaDeficit = Math.min(500, Math.round((gastoPrevisto * 0.2) / 50) * 50);
+  const consumo = p.consumoKcal ?? 0;
+  const deficitSeParar = gastoPrevisto - consumo;
+  return {
+    gastoPrevisto,
+    metaDeficit,
+    podeComer: gastoPrevisto - metaDeficit - consumo,
+    deficitSeParar,
+    deficitExcessivo: deficitSeParar > Math.max(1000, gastoPrevisto * 0.4),
+  };
+}
+
 /** Déficit do dia: positivo = gastou mais do que comeu. */
 export function deficit(gastoKcal: number, consumoKcal: number): number {
   return Math.round(gastoKcal - consumoKcal);

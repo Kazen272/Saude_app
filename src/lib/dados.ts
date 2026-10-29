@@ -4,6 +4,7 @@ import {
   fracaoDoDia,
   gastoDiario,
   metaProteina,
+  planoDoDia,
   relacaoCinturaAltura,
   ritmoSemanal,
   idadeEmAnos,
@@ -14,6 +15,7 @@ import {
   type Projecao,
   type Sexo,
   type NivelCintura,
+  type PlanoDoDia,
 } from './calculos';
 import { diaLocal, limitesDoDia, porSemana, somarDias } from './datas';
 import { alertaDeficitAgressivo, mediaCampo, resumirSono } from './bemestar';
@@ -67,6 +69,10 @@ export type ResumoDoDia = {
   macros: { proteina: number | null; carbo: number | null; gordura: number | null } | null;
   metaProteina: { min: number; max: number } | null;
   ritmo: { kgPorSemana: number; pctPorSemana: number } | null;
+  /** Quanto ainda dá para comer hoje (null sem perfil completo ou sem peso). */
+  plano: PlanoDoDia | null;
+  /** Já são 15h ou mais: hora de avisar se o dia vai fechar com déficit grande demais. */
+  tarde: boolean;
 };
 
 // Postgres devolve numeric como string; converte para número.
@@ -212,16 +218,19 @@ export function perfilEstaCompleto(p: Perfil): boolean {
  * mais o ajuste da recalibração. Devolve null se o perfil estiver incompleto
  * ou sem peso.
  */
+function tmbDoPerfil(perfil: Perfil, pesoRefKg: number | null, hoje: string): number | null {
+  return perfilEstaCompleto(perfil) && pesoRefKg != null
+    ? tmbMifflin({
+        sexo: perfil.sex as Sexo,
+        pesoKg: pesoRefKg,
+        alturaCm: perfil.height_cm as number,
+        idade: idadeEmAnos(perfil.birth_date as string, hoje),
+      })
+    : null;
+}
+
 function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades: Atividade[], hoje: string, ajusteKcal = 0) {
-  const tmb =
-    perfilEstaCompleto(perfil) && pesoRefKg != null
-      ? tmbMifflin({
-          sexo: perfil.sex as Sexo,
-          pesoKg: pesoRefKg,
-          alturaCm: perfil.height_cm as number,
-          idade: idadeEmAnos(perfil.birth_date as string, hoje),
-        })
-      : null;
+  const tmb = tmbDoPerfil(perfil, pesoRefKg, hoje);
   const agora = new Date();
   const fracaoHoje = fracaoDoDia(agora.getHours() * 60 + agora.getMinutes());
   return (dia: string) => {
@@ -429,8 +438,24 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
   const balancoOntem = analise.balancoDe(somarDias(hoje, -1));
   const nutriHoje = historico.nutricoes.find((n) => n.day === hoje);
   const agora = new Date();
+  const tmb = tmbDoPerfil(perfil, analise.pesoRef, hoje);
+  const atividadeHoje = historico.atividades.find((a) => a.day === hoje);
+  const plano =
+    tmb == null
+      ? null
+      : planoDoDia({
+          tmb,
+          kcalAtivas: atividadeHoje?.active_kcal ?? null,
+          kcalTotais: atividadeHoje?.total_kcal ?? null,
+          fatorAtividade: perfil.activity_factor,
+          ajusteKcal: analise.ajusteKcalDia,
+          fracaoDoDia: fracaoDoDia(agora.getHours() * 60 + agora.getMinutes()),
+          consumoKcal: balancoHoje.consumo,
+        });
 
   return {
+    plano,
+    tarde: agora.getHours() >= 15,
     horaParcial: `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`,
     ontem: { gasto: balancoOntem.gasto, consumo: balancoOntem.consumo, deficit: balancoOntem.deficit },
     macros: nutriHoje ? { proteina: nutriHoje.protein_g, carbo: nutriHoje.carbs_g, gordura: nutriHoje.fat_g } : null,

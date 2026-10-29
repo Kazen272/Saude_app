@@ -189,35 +189,72 @@ function Barra({ fracao, cor, trilho }: { fracao: number; cor: string; trilho: s
   );
 }
 
+const kcal = (n: number) => `${milhar(Math.abs(n))} kcal`;
+const arred50 = (n: number) => Math.round(n / 50) * 50;
+
+/** Texto do balanço sem sinal: "405 kcal de déficit" / "120 kcal de superávit". */
+const textoBalanco = (d: number) => `${kcal(d)} de ${d >= 0 ? 'déficit' : 'superávit'}`;
+
 function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
-  const { gasto, consumoKcal, deficitHoje } = resumo;
+  const { gasto, consumoKcal, deficitHoje, plano } = resumo;
   const maior = Math.max(gasto?.kcal ?? 0, consumoKcal ?? 0, 1);
+
+  // Destaque: quanto ainda dá para comer hoje (é a pergunta de quem abre o app).
+  let destaque: string;
+  let legenda: string;
+  if (!plano) {
+    destaque = '—';
+    legenda = 'Complete o perfil e registre o peso para ver quanto ainda dá para comer hoje.';
+  } else if (plano.podeComer > 0) {
+    destaque = `~${milhar(Math.max(50, arred50(plano.podeComer)))} kcal`;
+    legenda = `ainda dá para comer hoje e fechar o dia com cerca de ${kcal(plano.metaDeficit)} de déficit`;
+  } else if (plano.deficitSeParar > 0) {
+    destaque = 'Meta do dia feita';
+    legenda = `se não comer mais nada, o dia fecha com ~${kcal(arred50(plano.deficitSeParar))} de déficit (meta: ${kcal(plano.metaDeficit)})`;
+  } else {
+    destaque = 'Acima do gasto';
+    legenda = `o dia caminha para ~${kcal(arred50(-plano.deficitSeParar))} de superávit`;
+  }
+  const avisoExcesso = plano && resumo.tarde && plano.podeComer > 0 && plano.deficitExcessivo;
+
   return (
     <View style={{ backgroundColor: cores.tinta, borderRadius: 22, padding: 20, gap: 16 }}>
       <View style={{ gap: 4 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Balanço de hoje até {resumo.horaParcial}</Text>
-          <View style={{ backgroundColor: cores.escuroTrilho, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: cores.escuroSuave }}>parcial</Text>
-          </View>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Calorias de hoje</Text>
+          {plano && (
+            <View style={{ backgroundColor: cores.escuroTrilho, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: cores.escuroSuave }}>meta: {kcal(plano.metaDeficit)} de déficit</Text>
+            </View>
+          )}
         </View>
-        <Text style={{ fontSize: 36, fontWeight: '800', color: '#FFFFFF', fontVariant: ['tabular-nums'] }}>
-          {deficitHoje == null ? '—' : `${deficitHoje >= 0 ? '−' : '+'}${milhar(Math.abs(deficitHoje))} kcal`}
+        <Text style={{ fontSize: 34, fontWeight: '800', color: '#FFFFFF', fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>
+          {destaque}
         </Text>
-        <Text style={{ fontSize: 13, color: cores.escuroSuave }}>
-          {deficitHoje == null
-            ? consumoKcal == null
-              ? 'aguardando a dieta (FatSecret via Health Connect)'
-              : 'complete o perfil e registre o peso'
-            : deficitHoje >= 0
-              ? 'déficit até agora · o dia ainda não terminou'
-              : 'superávit até agora · o dia ainda não terminou'}
-        </Text>
+        <Text style={{ fontSize: 13, color: cores.escuroSuave, lineHeight: 18 }}>{legenda}</Text>
+        {plano && consumoKcal == null && (
+          <Text style={{ fontSize: 12, color: cores.escuroSuave, lineHeight: 17 }}>Nenhuma refeição chegou hoje ainda: a conta considera que nada foi comido.</Text>
+        )}
       </View>
+
+      {avisoExcesso && (
+        <View style={{ backgroundColor: '#3A2A1C', borderRadius: 12, padding: 12 }}>
+          <Text style={{ fontSize: 13, color: cores.laranjaVivo, lineHeight: 18, fontWeight: '600' }}>
+            Se parar de comer agora, o dia fecha com ~{kcal(arred50(plano.deficitSeParar))} de déficit. Déficit grande demais tira energia e massa muscular: faça as próximas refeições normalmente.
+          </Text>
+        </View>
+      )}
+
       <View style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+          <Text style={{ fontSize: 13, color: cores.escuroSuave, flexShrink: 1 }}>Até agora ({resumo.horaParcial})</Text>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF', fontVariant: ['tabular-nums'] }}>
+            {deficitHoje == null ? (consumoKcal == null ? 'aguardando a dieta' : '—') : textoBalanco(deficitHoje)}
+          </Text>
+        </View>
         <LinhaBalanco titulo="Consumido · dieta" valor={consumoKcal} fracao={(consumoKcal ?? 0) / maior} cor={cores.laranjaVivo} />
         <LinhaBalanco
-          titulo={gasto?.origem === 'estimativa' ? 'Gasto · estimado' : 'Gasto · relógio + metabolismo'}
+          titulo={gasto?.origem === 'estimativa' ? 'Gasto até agora · estimado' : 'Gasto até agora'}
           valor={gasto?.kcal ?? null}
           fracao={(gasto?.kcal ?? 0) / maior}
           cor={cores.verdeVivo}
@@ -226,9 +263,7 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
       <View style={{ borderTopWidth: 1, borderTopColor: cores.escuroTrilho, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
         <Text style={{ fontSize: 13, color: cores.escuroSuave, flexShrink: 1 }}>Ontem (dia completo)</Text>
         <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF', fontVariant: ['tabular-nums'] }}>
-          {resumo.ontem.deficit == null
-            ? '—'
-            : `${resumo.ontem.deficit >= 0 ? 'déficit de' : 'superávit de'} ${milhar(Math.abs(resumo.ontem.deficit))} kcal`}
+          {resumo.ontem.deficit == null ? '—' : textoBalanco(resumo.ontem.deficit)}
         </Text>
       </View>
     </View>
