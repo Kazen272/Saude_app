@@ -6,7 +6,8 @@ import { Escala } from '@/components/bemestar';
 import { Botao, Campo, Cartao, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
 import { salvarCheckin } from '@/lib/bemestar-dados';
 import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, registrarAgua, type RegistrosDoDia } from '@/lib/dados';
-import { decimal, diaLocal, nomeDoDia, numeroCurto } from '@/lib/datas';
+import { decimal, diaLocal, milhar, nomeDoDia, numeroCurto } from '@/lib/datas';
+import { sincronizar } from '@/lib/healthconnect';
 import { COLUNAS_EXTRAS, type Valores } from '@/lib/medidas';
 import { cores } from '@/lib/tema';
 
@@ -24,6 +25,7 @@ export default function Historico() {
   };
   const [adicionando, setAdicionando] = useState(false);
   const [erroAgua, setErroAgua] = useState<string | null>(null);
+  const [sincronizando, setSincronizando] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -89,6 +91,17 @@ export default function Historico() {
     }
     setOutraQtd('');
     adicionarAgua(ml);
+  }
+
+  async function sincronizarDieta() {
+    setSincronizando(true);
+    try {
+      const e = await sincronizar();
+      if (e.erro) setErro(e.erro);
+      await carregar();
+    } finally {
+      setSincronizando(false);
+    }
   }
 
   const ehHoje = dia === diaLocal();
@@ -215,6 +228,32 @@ export default function Historico() {
         <Escala campo="energia" valor={r?.checkin?.energia ?? null} aoEscolher={(v) => mudarCheckin('energia', v)} />
         <Escala campo="fome" valor={r?.checkin?.fome ?? null} aoEscolher={(v) => mudarCheckin('fome', v)} />
         <Escala campo="humor" valor={r?.checkin?.humor ?? null} aoEscolher={(v) => mudarCheckin('humor', v)} />
+      </Cartao>
+
+      {/* Dieta */}
+      <Cartao estilo={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Rotulo>Dieta (FatSecret)</Rotulo>
+          {r?.dieta && <Text style={{ fontSize: 12, color: cores.cinza }}>lida às {r.dieta.lidaEm}</Text>}
+        </View>
+        {r?.dieta ? (
+          <>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>{milhar(r.dieta.kcal)} kcal</Text>
+            <Text style={{ fontSize: 13, color: cores.tintaSuave }}>
+              {[
+                r.dieta.proteina != null ? `proteína ${Math.round(r.dieta.proteina)} g` : null,
+                r.dieta.carbo != null ? `carboidrato ${Math.round(r.dieta.carbo)} g` : null,
+                r.dieta.gordura != null ? `gordura ${Math.round(r.dieta.gordura)} g` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          </>
+        ) : (
+          <Nota>Nenhuma refeição deste dia chegou do Health Connect.</Nota>
+        )}
+        <Nota>Lançou ou corrigiu uma refeição no FatSecret? Ela chega quando o FatSecret envia ao Health Connect; depois toque em Sincronizar para trazer.</Nota>
+        <Botao titulo="Sincronizar agora" variante="suave" aoTocar={sincronizarDieta} ocupado={sincronizando} />
       </Cartao>
 
       <Nota>Treinos, passos e dieta vêm do Health Connect: para corrigir, ajuste no app de origem (Hevy, relógio ou FatSecret).</Nota>

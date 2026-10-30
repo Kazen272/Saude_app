@@ -128,6 +128,8 @@ export type RegistrosDoDia = {
   agua: { id: number; ml: number; hora: string }[];
   sono: { origem: string; deitou: string; acordou: string; qualidade: number | null }[];
   checkin: { energia: number | null; fome: number | null; humor: number | null } | null;
+  /** Dieta do dia como chegou do Health Connect (FatSecret), com a hora da última leitura. */
+  dieta: { kcal: number; proteina: number | null; carbo: number | null; gordura: number | null; lidaEm: string } | null;
 };
 
 const hhmm = (iso: string) => {
@@ -139,13 +141,14 @@ const hhmm = (iso: string) => {
 export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDia> {
   const [a, m, d] = dia.split('-').map(Number);
   const { inicio, fim } = limitesDoDia(new Date(a, m - 1, d));
-  const [corpo, agua, sono, checkin] = await Promise.all([
+  const [corpo, agua, sono, checkin, dieta] = await Promise.all([
     supabase.from('body_entries').select(`weight_kg, source, ${COLUNAS.join(', ')}`).eq('measured_on', dia).maybeSingle(),
     supabase.from('water_entries').select('id, amount_ml, logged_at').gte('logged_at', inicio).lt('logged_at', fim).order('logged_at'),
     supabase.from('sleep_sessions').select('bed_at, wake_at, quality, source').eq('night', dia),
     supabase.from('daily_checkins').select('energy, hunger, mood').eq('day', dia).maybeSingle(),
+    supabase.from('nutrition_days').select('kcal, protein_g, carbs_g, fat_g, synced_at').eq('day', dia).maybeSingle(),
   ]);
-  for (const r of [corpo, agua, sono, checkin]) if (r.error) throw r.error;
+  for (const r of [corpo, agua, sono, checkin, dieta]) if (r.error) throw r.error;
   const corpoLinha = corpo.data as unknown as Record<string, unknown> | null;
   return {
     corpo: corpoLinha
@@ -162,6 +165,16 @@ export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDi
       acordou: hhmm(x.wake_at as string),
       qualidade: (x.quality as number | null) ?? null,
     })),
+    dieta:
+      dieta.data && Number(dieta.data.kcal) > 0
+        ? {
+            kcal: Number(dieta.data.kcal),
+            proteina: num(dieta.data.protein_g),
+            carbo: num(dieta.data.carbs_g),
+            gordura: num(dieta.data.fat_g),
+            lidaEm: hhmm(dieta.data.synced_at as string),
+          }
+        : null,
     checkin: checkin.data ? { energia: checkin.data.energy as number | null, fome: checkin.data.hunger as number | null, humor: checkin.data.mood as number | null } : null,
   };
 }
