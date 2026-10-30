@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { fcRepousoDasAmostras, minutosDormindo, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia } from './healthconnect-regras.ts';
+import { descreverTipos, fcRepousoDasAmostras, minutosDormindo, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia } from './healthconnect-regras.ts';
 
 // Os testes rodam com TZ=America/Sao_Paulo (ver package.json), como o celular.
 
@@ -87,5 +87,13 @@ describe('fcRepousoDasAmostras', () => {
       a('2026-10-30T07:25:00Z', 0),
     ]);
     assert.deepEqual([...r.entries()], [['2026-10-30', 57]]);
+  });
+});
+
+describe('descreverTipos', () => {
+  it('junta tipos repetidos e usa "e" no fim', () => {
+    assert.equal(descreverTipos(['Steps', 'ActiveCaloriesBurned', 'TotalCaloriesBurned', 'HeartRate']), 'passos, calorias e frequência cardíaca');
+    assert.equal(descreverTipos(['Nutrition']), 'dieta');
+    assert.equal(descreverTipos([]), '');
   });
 });

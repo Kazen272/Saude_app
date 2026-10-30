@@ -46,14 +46,19 @@ export type EstadoSync = {
   contagem: { dias: number; noites: number; treinos: number; diasDieta: number; pesagens: number };
   /** Horário do dado mais recente do relógio que chegou ao Health Connect. */
   ultimoDadoRelogio: string | null;
+  /** Apps que gravam no Health Connect (ativados ou não) e o que cada um grava. */
+  apps: AppNoHealthConnect[];
   erro: string | null;
 };
+
+export type AppNoHealthConnect = { pacote: string; tipos: string[] };
 
 const ESTADO_VAZIO: EstadoSync = {
   ultimaSync: null,
   origens: { atividade: [], sono: [], treinos: [], dieta: [], peso: [] },
   contagem: { dias: 0, noites: 0, treinos: 0, diasDieta: 0, pesagens: 0 },
   ultimoDadoRelogio: null,
+  apps: [],
   erro: null,
 };
 
@@ -131,12 +136,49 @@ function inicioDaJanela(dias: number): string {
   return new Date(a, m - 1, d).toISOString();
 }
 
+/** Apps ativados pela pessoa: toda leitura é limitada a eles. */
+let origensAtivas: string[] = [];
+const filtroOrigens = () => ({ dataOriginFilter: origensAtivas });
+
+/** Apps que a pessoa ativou na aba Mais (salvo no perfil, vale em qualquer celular). */
+export async function carregarFontesAtivas(): Promise<string[]> {
+  const { data, error } = await supabase.from('profiles').select('health_sources').single();
+  if (error) throw error;
+  return (data?.health_sources as string[] | null) ?? [];
+}
+
+export async function salvarFontesAtivas(lista: string[]): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from('profiles').update({ health_sources: [...new Set(lista)] }).eq('id', u.user?.id ?? '');
+  if (error) throw error;
+}
+
+/** Quais apps gravam cada tipo de dado (sem filtro: é só para listar na tela, nada é salvo). */
+async function descobrirApps(tipos: RecordType[], inicio: string): Promise<AppNoHealthConnect[]> {
+  const porApp = new Map<string, Set<string>>();
+  for (const tipo of tipos) {
+    try {
+      const r = (await aggregateRecord({
+        recordType: tipo as 'Steps',
+        timeRangeFilter: { operator: 'between', startTime: inicio, endTime: new Date().toISOString() },
+      })) as { dataOrigins?: string[] };
+      for (const o of r.dataOrigins ?? []) {
+        if (!porApp.has(o)) porApp.set(o, new Set());
+        porApp.get(o)?.add(tipo);
+      }
+    } catch {
+      // tipo sem agregação ou sem dados: segue
+    }
+  }
+  return [...porApp.entries()].map(([pacote, t]) => ({ pacote, tipos: [...t] })).sort((a, b) => a.pacote.localeCompare(b.pacote));
+}
+
 async function lerTodos<T extends RecordType>(tipo: T, inicio: string) {
   const fim = new Date().toISOString();
   const registros = [];
   let pageToken: string | undefined;
   do {
-    const r = await readRecords(tipo, { timeRangeFilter: { operator: 'between', startTime: inicio, endTime: fim }, pageSize: 1000, pageToken });
+    const r = await readRecords(tipo, { timeRangeFilter: { operator: 'between', startTime: inicio, endTime: fim }, pageSize: 1000, pageToken, ...filtroOrigens() });
     registros.push(...r.records);
     pageToken = r.pageToken || undefined;
   } while (pageToken);
@@ -149,6 +191,7 @@ async function somaPorDia(tipo: 'Steps' | 'ActiveCaloriesBurned' | 'TotalCalorie
     recordType: tipo,
     timeRangeFilter: { operator: 'between', startTime: inicio, endTime: new Date().toISOString() },
     timeRangeSlicer: { period: 'DAYS', length: 1 },
+    ...filtroOrigens(),
   });
   const porDia = new Map<string, number>();
   const origens = new Set<string>();
@@ -167,7 +210,8 @@ async function somaPorDia(tipo: 'Steps' | 'ActiveCaloriesBurned' | 'TotalCalorie
   return { porDia, origens };
 }
 
-const tem = (concedidas: Set<RecordType>, t: RecordType) => concedidas.has(t);
+/** Lê um tipo só se a permissão foi dada e há algum app ativado (filtro vazio = todos, por isso o cuidado). */
+const tem = (concedidas: Set<RecordType>, t: RecordType) => origensAtivas.length > 0 && concedidas.has(t);
 
 /**
  * Lê os últimos 28 dias do Health Connect e grava no banco.
@@ -193,7 +237,18 @@ async function executarSincronizacao(): Promise<EstadoSync> {
     if (!uid) throw new Error('Sessão expirada. Entre de novo.');
 
     const inicio = inicioDaJanela(DIAS);
+    const inicioDia = somarDias(diaLocal(), -(DIAS - 1));
     const estado: EstadoSync = { ...ESTADO_VAZIO, origens: { ...ESTADO_VAZIO.origens }, contagem: { ...ESTADO_VAZIO.contagem } };
+    estado.apps = await descobrirApps([...concedidas], inicio);
+    origensAtivas = await carregarFontesAtivas();
+    // Remove do banco o que, na janela, não veio dos apps ativados (desativado ou apagado na origem).
+    const limpar = async (tabela: string, coluna: string, manter: string[], extra?: (q: any) => any) => {
+      let q = supabase.from(tabela).delete().eq('user_id', uid).gte(coluna, inicioDia);
+      if (extra) q = extra(q);
+      if (manter.length) q = q.not(coluna, 'in', `(${manter.join(',')})`);
+      const { error } = await q;
+      if (error) throw error;
+    };
 
     // --- Atividade do dia: passos, calorias, FC de repouso, minutos de sono ---
     const vazio = { porDia: new Map<string, number>(), origens: new Set<string>() };
@@ -234,6 +289,7 @@ async function executarSincronizacao(): Promise<EstadoSync> {
           timeRangeFilter: { operator: 'between', startTime: inicioDaJanela(2), endTime: new Date().toISOString() },
           ascendingOrder: false,
           pageSize: 20,
+          ...filtroOrigens(),
         });
         marcas.push(...r.records.map((x) => x.endTime));
       } catch {
@@ -258,6 +314,7 @@ async function executarSincronizacao(): Promise<EstadoSync> {
       const { error } = await supabase.from('daily_activity').upsert(linhasAtividade, { onConflict: 'user_id,day' });
       if (error) throw error;
     }
+    await limpar('daily_activity', 'day', [...dias]);
     estado.origens.atividade = [...new Set([...passos.origens, ...ativas.origens, ...totais.origens, ...origensFc])];
     estado.contagem.dias = linhasAtividade.length;
 
@@ -269,10 +326,12 @@ async function executarSincronizacao(): Promise<EstadoSync> {
       );
       if (error) throw error;
     }
+    await limpar('sleep_sessions', 'night', noites.map((n) => n.dia), (q) => q.eq('source', 'health_connect'));
     estado.origens.sono = [...new Set(noites.map((n) => n.origem).filter((o): o is string => !!o))];
     estado.contagem.noites = noites.length;
 
     // --- Treinos (Hevy, relógio...) ---
+    let idsTreinos: string[] = [];
     if (tem(concedidas, 'ExerciseSession')) {
       const sessoes = (await lerTodos('ExerciseSession', inicio)).sort((a, b) => a.startTime.localeCompare(b.startTime));
       // Mesmo treino registrado por dois apps: fica o primeiro (Hevy tem prioridade).
@@ -313,21 +372,27 @@ async function executarSincronizacao(): Promise<EstadoSync> {
         const { error } = await supabase.from('workouts').upsert(linhas, { onConflict: 'user_id,source,external_id' });
         if (error) throw error;
       }
-      // Treino apagado no app de origem (ou que virou duplicado) sai daqui também.
-      let limpar = supabase.from('workouts').delete().eq('user_id', uid).eq('source', 'health_connect').gte('started_at', inicio);
-      if (linhas.length) limpar = limpar.not('external_id', 'in', `(${linhas.map((l) => `"${l.external_id.replace(/"/g, '')}"`).join(',')})`);
-      const { error: erroLimpeza } = await limpar;
-      if (erroLimpeza) throw erroLimpeza;
+      idsTreinos = linhas.map((l) => l.external_id);
       estado.origens.treinos = [...new Set(escolhidas.map((s) => s.metadata?.dataOrigin).filter((o): o is string => !!o))];
       estado.contagem.treinos = linhas.length;
     }
 
     // --- Dieta (FatSecret ou outro app de nutrição) ---
+    // Treino apagado no app de origem, de app desativado ou que virou duplicado sai daqui também.
+    {
+      let q = supabase.from('workouts').delete().eq('user_id', uid).eq('source', 'health_connect').gte('started_at', inicio);
+      if (idsTreinos.length) q = q.not('external_id', 'in', `(${idsTreinos.map((id) => `"${id.replace(/"/g, '')}"`).join(',')})`);
+      const { error } = await q;
+      if (error) throw error;
+    }
+
+    let diasDieta: string[] = [];
     if (tem(concedidas, 'Nutrition')) {
       const grupos = await aggregateGroupByPeriod({
         recordType: 'Nutrition',
         timeRangeFilter: { operator: 'between', startTime: inicio, endTime: new Date().toISOString() },
         timeRangeSlicer: { period: 'DAYS', length: 1 },
+        ...filtroOrigens(),
       });
       const g = (m?: { inGrams?: number }) => (m?.inGrams != null ? Math.round(m.inGrams * 10) / 10 : null);
       const linhas = grupos
@@ -346,11 +411,15 @@ async function executarSincronizacao(): Promise<EstadoSync> {
         const { error } = await supabase.from('nutrition_days').upsert(linhas, { onConflict: 'user_id,day' });
         if (error) throw error;
       }
+      diasDieta = linhas.map((l) => l.day);
       estado.origens.dieta = [...new Set(grupos.flatMap((x) => x.result.dataOrigins ?? []))];
       estado.contagem.diasDieta = linhas.length;
     }
 
+    await limpar('nutrition_days', 'day', diasDieta, (q) => q.eq('source', 'health_connect'));
+
     // --- Peso de balança conectada (não substitui o que foi digitado no app) ---
+    let diasPeso: string[] = [];
     if (tem(concedidas, 'Weight')) {
       const registros = await lerTodos('Weight', inicio);
       const porDia = ultimoPorDia(registros.map((r) => ({ quando: r.time, valor: r.weight.inKilograms })));
@@ -363,7 +432,9 @@ async function executarSincronizacao(): Promise<EstadoSync> {
       }
       estado.origens.peso = [...new Set(registros.map((r) => r.metadata?.dataOrigin).filter((o): o is string => !!o))];
       estado.contagem.pesagens = linhas.length;
+      diasPeso = linhas.map((l) => l.measured_on);
     }
+    await limpar('body_entries', 'measured_on', diasPeso, (q) => q.eq('source', 'health_connect'));
 
     estado.ultimaSync = new Date().toISOString();
     await salvarEstado(estado);

@@ -15,6 +15,8 @@ const APPS: Record<string, string> = {
   'com.garmin.android.apps.connectmobile': 'Garmin Connect',
   'com.myfitnesspal.android': 'MyFitnessPal',
   'com.strava': 'Strava',
+  android: 'Celular (Android)',
+  'com.google.android.apps.healthdata': 'Health Connect',
 };
 
 export function nomeDoApp(pacote: string | null | undefined): string {
@@ -154,4 +156,24 @@ export function fcRepousoDasAmostras(amostras: MedidaInstantanea[]): Map<string,
     if (atual == null || media < atual) porDia.set(j.dia, media);
   }
   return porDia;
+}
+
+/** Como cada tipo de dado aparece na tela. */
+const NOMES_TIPO: Record<string, string> = {
+  Steps: 'passos',
+  ActiveCaloriesBurned: 'calorias',
+  TotalCaloriesBurned: 'calorias',
+  HeartRate: 'frequência cardíaca',
+  RestingHeartRate: 'frequência cardíaca',
+  SleepSession: 'sono',
+  ExerciseSession: 'treinos',
+  Nutrition: 'dieta',
+  Weight: 'peso',
+};
+
+/** "passos, calorias e sono" a partir dos tipos de dado do Health Connect. */
+export function descreverTipos(tipos: string[]): string {
+  const nomes = [...new Set(tipos.map((t) => NOMES_TIPO[t]).filter(Boolean))];
+  if (nomes.length <= 1) return nomes[0] ?? '';
+  return `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`;
 }

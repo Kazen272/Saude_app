@@ -1,11 +1,13 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Switch, Text, View } from 'react-native';
 
 import { Botao, Cartao, Nota, Pilula, Rotulo } from '@/components/ui';
 import {
   abrirConfiguracoes,
   abrirLojaHealthConnect,
+  carregarFontesAtivas,
+  salvarFontesAtivas,
   disponibilidade,
   lerEstado,
   nomeDoApp,
@@ -16,9 +18,9 @@ import {
   type Disponibilidade,
   type EstadoSync,
 } from '@/lib/healthconnect';
+import { descreverTipos } from '@/lib/healthconnect-regras';
 import { cores } from '@/lib/tema';
 
-const HEVY = 'com.hevy';
 
 function quandoFoi(iso: string | null): string {
   if (!iso) return 'nunca';
@@ -30,7 +32,6 @@ function quandoFoi(iso: string | null): string {
   return `há ${Math.round(h / 24)} dia${h >= 48 ? 's' : ''}`;
 }
 
-const lista = (origens: string[]) => [...new Set(origens.map(nomeDoApp))].join(', ');
 
 /** Cartão da aba Mais: conectar, status de cada fonte e sincronizar. */
 export function CartaoHealthConnect() {
@@ -38,13 +39,34 @@ export function CartaoHealthConnect() {
   const [liberadas, setLiberadas] = useState<number>(0);
   const [estado, setEstado] = useState<EstadoSync | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [ativos, setAtivos] = useState<string[] | null>(null);
+  const [erroFontes, setErroFontes] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     const d = await disponibilidade();
     setDisp(d);
     setEstado(await lerEstado());
     setLiberadas(d === 'disponivel' ? (await permissoesConcedidas().catch(() => [])).length : 0);
+    setAtivos(await carregarFontesAtivas().catch(() => null));
   }, []);
+
+  async function alternarApp(pacote: string) {
+    if (!ativos) return;
+    const novo = ativos.includes(pacote) ? ativos.filter((x) => x !== pacote) : [...ativos, pacote];
+    const antes = ativos;
+    setAtivos(novo);
+    setErroFontes(null);
+    setOcupado(true);
+    try {
+      await salvarFontesAtivas(novo);
+      setEstado(await sincronizar());
+    } catch {
+      setAtivos(antes);
+      setErroFontes('Não foi possível salvar. Confira a internet e tente de novo.');
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -96,10 +118,11 @@ export function CartaoHealthConnect() {
   }
 
   const conectado = liberadas > 0;
-  const o = estado?.origens;
-  const relogio = [...new Set([...(o?.atividade ?? []), ...(o?.sono ?? []), ...(o?.treinos ?? []).filter((x) => x !== HEVY)])].filter((x) => x !== HEVY);
-  const temHevy = o?.treinos.includes(HEVY) ?? false;
-  const dieta = o?.dieta ?? [];
+  const apps = [
+    ...(estado?.apps ?? []),
+    ...(ativos ?? []).filter((p) => !estado?.apps.some((a) => a.pacote === p)).map((pacote) => ({ pacote, tipos: [] as string[] })),
+  ];
+  const nenhumAtivo = ativos != null && ativos.length === 0;
 
   return (
     <Cartao estilo={{ gap: 12 }}>
@@ -114,31 +137,45 @@ export function CartaoHealthConnect() {
       </View>
 
       {conectado && (
-        <View style={{ gap: 0 }}>
-          <Fonte
-            nome="Relógio"
-            ok={relogio.length > 0}
-            detalhe={
-              relogio.length
-                ? `${lista(relogio)} · ${estado?.contagem.dias ?? 0} dias, ${estado?.contagem.noites ?? 0} noites`
-                : 'nada recebido: ative o Health Connect no app do relógio (Zepp, Mi Fitness...)'
-            }
-          />
-          <Fonte
-            nome="Hevy"
-            ok={temHevy}
-            detalhe={temHevy ? `${estado?.contagem.treinos ?? 0} treinos nos últimos 28 dias` : 'nada recebido: no Hevy, Configurações › Integrações › Health Connect'}
-          />
-          <Fonte
-            nome="Dieta"
-            ok={dieta.length > 0}
-            detalhe={
-              dieta.length
-                ? `${lista(dieta)} · ${estado?.contagem.diasDieta ?? 0} dias`
-                : 'nada recebido: o FatSecret precisa compartilhar nutrição com o Health Connect'
-            }
-            ultima
-          />
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tintaSuave }}>Apps que o Saúde lê</Text>
+          {nenhumAtivo && (
+            <View style={{ backgroundColor: cores.laranjaClaro, borderRadius: 12, padding: 12 }}>
+              <Text style={{ fontSize: 13, color: cores.laranjaTexto, fontWeight: '600', lineHeight: 18 }}>
+                Nenhum app ativado: o Saúde não está lendo nada do Health Connect. Ative abaixo só os apps que você quer usar.
+              </Text>
+            </View>
+          )}
+          {apps.length === 0 ? (
+            <Nota>Nenhum app gravou dados no Health Connect nos últimos 28 dias. Toque em Sincronizar depois de ativar o Health Connect no app do relógio, no Hevy ou no FatSecret.</Nota>
+          ) : (
+            <View>
+              {apps.map((a, i) => {
+                const ligado = ativos?.includes(a.pacote) ?? false;
+                return (
+                  <View
+                    key={a.pacote}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: i === apps.length - 1 ? 0 : 1, borderBottomColor: cores.linhaSuave }}
+                  >
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>{nomeDoApp(a.pacote)}</Text>
+                      <Text style={{ fontSize: 12, color: cores.cinza }}>{a.tipos.length ? descreverTipos(a.tipos) : 'nada gravado nos últimos 28 dias'}</Text>
+                    </View>
+                    <Switch
+                      accessibilityLabel={`Ler dados de ${nomeDoApp(a.pacote)}`}
+                      value={ligado}
+                      disabled={ocupado || ativos == null}
+                      onValueChange={() => alternarApp(a.pacote)}
+                      trackColor={{ true: cores.verde, false: cores.linha }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          )}
+          {erroFontes && <Text style={{ fontSize: 13, fontWeight: '600', color: cores.laranja }}>{erroFontes}</Text>}
+          <Nota>Desligar um app apaga do Saúde os dados dele dos últimos 28 dias (nada muda no app nem no Health Connect). Não achou um app? Ative o Health Connect dentro dele (Hevy, FatSecret, Strava, Zepp...) e toque em Sincronizar.</Nota>
         </View>
       )}
 
@@ -162,17 +199,5 @@ export function CartaoHealthConnect() {
         </>
       )}
     </Cartao>
-  );
-}
-
-function Fonte({ nome, ok, detalhe, ultima = false }: { nome: string; ok: boolean; detalhe: string; ultima?: boolean }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: ultima ? 0 : 1, borderBottomColor: cores.linhaSuave }}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: cores.tinta }}>{nome}</Text>
-        <Text style={{ fontSize: 12, color: ok ? cores.cinza : cores.laranja }}>{detalhe}</Text>
-      </View>
-      <Pilula texto={ok ? 'Recebendo' : 'Sem dados'} tom={ok ? 'verde' : 'laranja'} />
-    </View>
   );
 }

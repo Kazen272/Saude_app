@@ -44,10 +44,16 @@ export function gastoDiario(p: {
    * vale mesmo abaixo do basal da fórmula, que pode superestimar a pessoa.
    */
   confiarNoTotal?: boolean;
+  /** Gasto típico de um dia inteiro pelo relógio: a estimativa nunca passa dele. */
+  tetoTipico?: number | null;
 }): { kcal: number; origem: 'relogio' | 'estimativa' } {
   const f = Math.max(0, Math.min(1, p.fracaoDoDia ?? 1));
   const basal = p.tmb * f;
   const ajuste = (p.ajusteKcal ?? 0) * f;
+  // Relógio em uso: o total que ele mediu (basal + atividade) vale mais que a fórmula.
+  if (p.confiarNoTotal && p.kcalTotais != null && p.kcalTotais > 0) {
+    return { kcal: Math.round(p.kcalTotais + ajuste), origem: 'relogio' };
+  }
   if (p.kcalAtivas != null && p.kcalAtivas > 0) {
     return { kcal: Math.round(basal + p.kcalAtivas + ajuste), origem: 'relogio' };
   }
@@ -55,7 +61,9 @@ export function gastoDiario(p: {
   if (p.kcalTotais != null && p.kcalTotais > 0 && (p.confiarNoTotal || p.kcalTotais > basal)) {
     return { kcal: Math.round(p.kcalTotais + ajuste), origem: 'relogio' };
   }
-  return { kcal: Math.round(basal * p.fatorAtividade + ajuste), origem: 'estimativa' };
+  const estimativa = basal * p.fatorAtividade;
+  const teto = p.tetoTipico != null && p.tetoTipico > 0 ? p.tetoTipico * f : Infinity;
+  return { kcal: Math.round(Math.min(estimativa, teto) + ajuste), origem: 'estimativa' };
 }
 
 /** Fração do dia já decorrida num horário local (minutos desde 0h). */

@@ -54,14 +54,32 @@ export default function Fotos() {
   const agora = daPose.find((f) => f.dia === selecionada) ?? daPose.at(-1);
   const medidaDe = (dia?: string) => {
     if (!dia) return null;
-    // a medida registrada mais próxima até aquele dia
-    return [...medidas].reverse().find((m) => m.dia <= dia && m.pesoKg != null) ?? null;
+    // a pesagem mais próxima da foto (antes ou depois), até 7 dias de distância
+    const dist = (m: Medidas) => Math.abs(Date.parse(m.dia) - Date.parse(dia)) / 86_400_000;
+    return (
+      medidas
+        .filter((m) => m.pesoKg != null && dist(m) <= 7)
+        .sort((a, b) => dist(a) - dist(b) || b.dia.localeCompare(a.dia))[0] ?? null
+    );
   };
   const pesoAntes = medidaDe(antes?.dia)?.pesoKg ?? null;
   const pesoAgora = medidaDe(agora?.dia)?.pesoKg ?? null;
   const cinturas = medidas.filter((m) => m.cinturaCm != null);
   const deltaCintura =
     cinturas.length >= 2 ? (cinturas[cinturas.length - 1].cinturaCm as number) - (cinturas[0].cinturaCm as number) : null;
+  const duasFotos = !!agora && agora !== antes;
+  const textoPeso =
+    duasFotos && pesoAntes != null && pesoAgora != null
+      ? `${decimal(pesoAntes)} → ${decimal(pesoAgora)} kg (${variacao(pesoAgora - pesoAntes, 'kg')})`
+      : !duasFotos
+        ? 'com 2 fotos deste ângulo'
+        : 'registre o peso perto da data das fotos';
+  const textoCintura =
+    deltaCintura != null
+      ? `${variacao(deltaCintura, 'cm', 1)} desde ${diaCurto(cinturas[0].dia)}`
+      : cinturas.length === 1
+        ? `${decimal(cinturas[0].cinturaCm as number)} cm (1 medida)`
+        : 'registre na aba Registrar';
   const jaTemHoje = daPose.some((f) => f.dia === diaLocal());
 
   return (
@@ -117,11 +135,8 @@ export default function Fotos() {
         </Cartao>
 
         <Cartao estilo={{ gap: 0, paddingVertical: 4 }}>
-          <LinhaDado
-            titulo="Peso"
-            valor={pesoAntes != null && pesoAgora != null && agora !== antes ? variacao(pesoAgora - pesoAntes, 'kg') : '—'}
-          />
-          <LinhaDado titulo="Cintura" valor={deltaCintura != null ? variacao(deltaCintura, 'cm', 0) : '—'} ultima />
+          <LinhaDado titulo="Peso entre as fotos" valor={textoPeso} pendente={!(duasFotos && pesoAntes != null && pesoAgora != null)} />
+          <LinhaDado titulo="Cintura" valor={textoCintura} pendente={cinturas.length === 0} ultima />
         </Cartao>
 
         <View style={{ gap: 8 }}>
@@ -212,19 +227,32 @@ function Quadro({ titulo, foto, pesoKg, vazio, destaque = false }: { titulo: str
   );
 }
 
-function LinhaDado({ titulo, valor, ultima = false }: { titulo: string; valor: string; ultima?: boolean }) {
+function LinhaDado({ titulo, valor, pendente = false, ultima = false }: { titulo: string; valor: string; pendente?: boolean; ultima?: boolean }) {
   return (
     <View
       style={{
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
         paddingVertical: 12,
         borderBottomWidth: ultima ? 0 : 1,
         borderBottomColor: cores.linhaSuave,
       }}
     >
       <Text style={{ fontSize: 14, color: cores.tintaSuave }}>{titulo}</Text>
-      <Text style={{ fontSize: 15, fontWeight: '800', color: cores.verdeTexto, fontVariant: ['tabular-nums'] }}>{valor}</Text>
+      <Text
+        style={{
+          flexShrink: 1,
+          textAlign: 'right',
+          fontSize: pendente ? 13 : 15,
+          fontWeight: pendente ? '600' : '800',
+          color: pendente ? cores.cinza : cores.verdeTexto,
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {valor}
+      </Text>
     </View>
   );
 }

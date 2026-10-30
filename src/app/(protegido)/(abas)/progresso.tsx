@@ -4,7 +4,7 @@ import { Pressable, RefreshControl, ScrollView, Text, View, StyleSheet } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GradeCheckins, GraficoSono } from '@/components/bemestar';
-import { GraficoDeficit, GraficoPeso, GraficoSemanas } from '@/components/graficos';
+import { GraficoPeso, GraficoSemanas } from '@/components/graficos';
 import { CartaoMedidas } from '@/components/medidas';
 import { Cabecalho, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import { LIMITE_RITMO_PCT } from '@/lib/calculos';
@@ -138,33 +138,14 @@ export default function Progresso() {
           )}
         </Cartao>
 
-        {/* Déficit */}
-        <Cartao estilo={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <View style={{ gap: 2 }}>
-              <Rotulo>Déficit · 7 dias completos</Rotulo>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>
-                {dados?.semana.deficitTotal == null ? '—' : `${milhar(dados.semana.deficitTotal)} kcal`}
-              </Text>
-            </View>
-            {dados?.semana.deficitTotal != null && (
-              <Text style={{ fontSize: 13, color: cores.cinza }}>≈ {decimal(dados.semana.deficitTotal / 7700, 2)} kg</Text>
-            )}
-          </View>
-          {dados && <GraficoDeficit dias={dados.ultimos7} hoje={hoje} />}
-        </Cartao>
+        {/* Calorias dia a dia */}
+        <CartaoCalorias dados={dados} />
 
-        {/* Resumo da semana */}
+        {/* Hábitos da semana */}
         <Cartao estilo={{ gap: 0, paddingVertical: 4 }}>
           <View style={{ paddingTop: 12, paddingBottom: 2 }}>
-            <Rotulo>Últimos 7 dias completos (até ontem)</Rotulo>
+            <Rotulo>Hábitos · 7 dias completos (até ontem)</Rotulo>
           </View>
-          <LinhaResumo titulo="Gasto calórico da semana" valor={dados?.semana.gastoTotal != null ? `${milhar(dados.semana.gastoTotal)} kcal` : '—'} />
-          <LinhaResumo
-            titulo="Consumo da semana"
-            valor={dados?.semana.consumoTotal != null ? `${milhar(dados.semana.consumoTotal)} kcal` : '—'}
-            detalhe={dados && dados.semana.diasComDieta > 0 && dados.semana.diasComDieta < 7 ? `${dados.semana.diasComDieta} de 7 dias com dieta` : undefined}
-          />
           <LinhaResumo
             titulo="Proteína (média/dia)"
             valor={dados?.proteinaMediaSemana != null ? `${dados.proteinaMediaSemana} g` : '—'}
@@ -297,5 +278,74 @@ function LinhaResumo({ titulo, valor, detalhe, ultima = false }: { titulo: strin
       </View>
       <Text style={{ fontSize: 15, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>{valor}</Text>
     </View>
+  );
+}
+
+const NOMES_DIA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const rotuloDia = (dia: string) => {
+  const [a, m, d] = dia.split('-').map(Number);
+  return `${NOMES_DIA[new Date(a, m - 1, d).getDay()]} ${d}`;
+};
+
+/** Os 7 dias completos em tabela: o que comeu, o que gastou e o saldo de cada um. */
+function CartaoCalorias({ dados }: { dados: DadosProgresso | null }) {
+  const dias = dados ? [...dados.ultimos7].reverse() : [];
+  const comDieta = dias.filter((d) => d.deficit != null);
+  const total = comDieta.reduce((s, d) => s + (d.deficit as number), 0);
+  const algumEstimado = dias.some((d) => d.gastoEstimado && d.gasto != null);
+  const col = { width: 58, textAlign: 'right' as const, fontVariant: ['tabular-nums' as const] };
+
+  return (
+    <Cartao estilo={{ gap: 12 }}>
+      <View style={{ gap: 2 }}>
+        <Rotulo>Calorias · 7 dias completos</Rotulo>
+        <Text style={{ fontSize: 26, fontWeight: '800', color: cores.tinta, fontVariant: ['tabular-nums'] }}>
+          {comDieta.length ? `${milhar(Math.abs(total))} kcal de ${total >= 0 ? 'déficit' : 'superávit'}` : '—'}
+        </Text>
+        <Text style={{ fontSize: 13, color: cores.cinza }}>
+          {comDieta.length
+            ? `soma dos ${comDieta.length} dia${comDieta.length === 1 ? '' : 's'} com dieta registrada${total > 0 ? ` · ≈ ${decimal(total / 7700, 2)} kg de gordura` : ''}`
+            : 'nenhum dia com dieta registrada na semana'}
+        </Text>
+      </View>
+
+      <View>
+        <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: cores.linha }}>
+          <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: cores.cinza }}>Dia</Text>
+          <Text style={[col, { fontSize: 12, fontWeight: '700', color: cores.cinza }]}>Comeu</Text>
+          <Text style={[col, { fontSize: 12, fontWeight: '700', color: cores.cinza }]}>Gastou</Text>
+          <Text style={[col, { width: 72, fontSize: 12, fontWeight: '700', color: cores.cinza }]}>Saldo</Text>
+        </View>
+        {dias.map((d) => {
+          const def = d.deficit;
+          return (
+            <View key={d.dia} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderBottomWidth: 1, borderBottomColor: cores.linhaSuave }}>
+                <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: cores.tinta }} numberOfLines={1}>{rotuloDia(d.dia)}</Text>
+                <Text style={[col, { fontSize: 14, color: d.consumo == null ? cores.cinza : cores.tinta }]}>{d.consumo == null ? '—' : milhar(d.consumo)}</Text>
+                <Text style={[col, { fontSize: 14, color: cores.tinta }]}>
+                  {d.gasto == null ? '—' : `${milhar(d.gasto)}${d.gastoEstimado ? '*' : ''}`}
+                </Text>
+                <View style={{ width: 72, alignItems: 'flex-end' }}>
+                  {def == null ? (
+                    <Text style={{ fontSize: 12, color: cores.cinza }}>sem dieta</Text>
+                  ) : (
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: def >= 0 ? cores.verdeClaro : cores.laranjaClaro }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: def >= 0 ? cores.verdeEscuro : cores.laranjaTexto, fontVariant: ['tabular-nums'] }}>
+                        {def >= 0 ? '−' : '+'}
+                        {milhar(Math.abs(def))}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+            </View>
+          );
+        })}
+      </View>
+
+      <Nota>
+        Saldo verde (−) = déficit: gastou mais do que comeu. Laranja (+) = superávit. Comeu: dieta do FatSecret. Gastou: relógio (metabolismo + atividade)
+        {algumEstimado ? '; * = sem dados do relógio, estimado pelo seu perfil' : ''}. Refeição lançada depois entra na próxima sincronização.
+      </Nota>
+    </Cartao>
   );
 }

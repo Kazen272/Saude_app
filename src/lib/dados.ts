@@ -239,7 +239,7 @@ function tipicoDoRelogio(atividades: Atividade[], tmb: number | null, hoje: stri
 
 function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades: Atividade[], hoje: string, ajusteKcal = 0) {
   const tmb = tmbDoPerfil(perfil, pesoRefKg, hoje);
-  const relogioEmUso = tipicoDoRelogio(atividades, tmb, hoje) != null;
+  const tipico = tipicoDoRelogio(atividades, tmb, hoje);
   const agora = new Date();
   const fracaoHoje = fracaoDoDia(agora.getHours() * 60 + agora.getMinutes());
   return (dia: string) => {
@@ -252,12 +252,14 @@ function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades
       fatorAtividade: perfil.activity_factor,
       ajusteKcal,
       fracaoDoDia: dia === hoje ? fracaoHoje : 1,
-      confiarNoTotal: dia === hoje && relogioEmUso,
+      // Dia completo com total baixo demais = relógio fora do pulso parte do dia.
+      confiarNoTotal: tipico != null && (dia === hoje || (a?.total_kcal ?? 0) >= tmb * 0.6),
+      tetoTipico: tipico,
     });
   };
 }
 
-type BalancoDia = DiaBalanco & { deficit: number | null };
+export type BalancoDia = DiaBalanco & { deficit: number | null; gastoEstimado: boolean };
 
 /**
  * Análise comum às telas Hoje e Progresso, sobre os últimos 28 dias:
@@ -271,9 +273,10 @@ function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividad
   const pesoRef = medias.at(-1)?.pesoKg ?? null;
   const consumoDe = (dia: string) => nutricoes.find((n) => n.day === dia)?.kcal ?? null;
   const balancoCom = (gastoDe: ReturnType<typeof calculadoraDeGasto>) => (dia: string): BalancoDia => {
-    const gasto = gastoDe(dia)?.kcal ?? null;
+    const g = gastoDe(dia);
+    const gasto = g?.kcal ?? null;
     const consumo = consumoDe(dia);
-    return { dia, gasto, consumo, deficit: gasto != null && consumo != null ? deficit(gasto, consumo) : null };
+    return { dia, gasto, consumo, deficit: gasto != null && consumo != null ? deficit(gasto, consumo) : null, gastoEstimado: g?.origem === 'estimativa' };
   };
 
   // 1–2. Previsto × real com o gasto sem ajuste.

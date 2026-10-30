@@ -51,6 +51,7 @@ preciso gerar um APK novo.
 - [x] Perimetria: cintura e quadril + 13 medidas da avaliação (tronco, braços e pernas, esquerdo/direito), com evolução por medida
 - [x] Cálculos: metabolismo basal, gasto, déficit, média móvel, projeção, recalibração
 - [x] Leitura do Health Connect: passos, calorias, FC de repouso (ou estimada da frequência cardíaca contínua), sono, treinos, nutrição e peso (últimos 28 dias); ignora a estimativa própria do Health Connect para calorias totais sem app de origem
+- [x] Fontes escolhidas: em Mais, a pessoa ativa app por app (Zepp, Hevy, FatSecret, Strava...); só o que vem deles é lido, e desligar apaga os dados daquele app dos últimos 28 dias
 - [x] Modo escuro: seguir o celular, claro ou escuro (Mais → Aparência)
 - [ ] Dieta do FatSecret: entra pelo Health Connect se o FatSecret gravar nutrição lá (a confirmar no celular)
 - [x] Gráficos de progresso: peso com média, meta e projeção; déficit diário; resumo da semana; previsto × real

@@ -195,3 +195,14 @@ describe('relógio abaixo da fórmula', () => {
     assert.equal(planoDoDia({ tmb: 2050, fatorAtividade: 1.55, fracaoDoDia: 0.5, consumoKcal: 0, gastoTipicoRelogio: 1985 }).gastoPrevisto, 1985);
   });
 });
+
+describe('gasto: relógio primeiro', () => {
+  it('com o relógio em uso, o total medido vale mais que basal + ativas da fórmula', () => {
+    assert.equal(gastoDiario({ tmb: 2050, kcalAtivas: 191, kcalTotais: 2112, fatorAtividade: 1.55, confiarNoTotal: true }).kcal, 2112);
+  });
+  it('sem dados do dia, a estimativa pelo fator não passa do gasto típico do relógio', () => {
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, tetoTipico: 1900 }).kcal, 1900);
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, tetoTipico: 1900, fracaoDoDia: 0.5 }).kcal, 950);
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55 }).kcal, 3178);
+  });
+});
