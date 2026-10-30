@@ -20,6 +20,7 @@ export default function Fontes() {
           <Cartao estilo={{ gap: 0, paddingVertical: 4 }}>
             <ItemMenu href="/relatorio" icone="stats-chart-outline" titulo="Relatório da semana" detalhe="o que melhorou e o que piorou" />
             <ItemMenu href="/exames" icone="water-outline" titulo="Exames de sangue" detalhe="resultados, referências e histórico" />
+            <ItemMenu href="/atividades" icone="barbell-outline" titulo="Atividades" detalhe="luta, corrida, yoga… o que você faz toda semana" />
             <ItemMenu href="/sono" icone="moon-outline" titulo="Sono" detalhe="registrar noites e ver a semana" />
             <ItemMenu href="/lembretes" icone="notifications-outline" titulo="Lembretes" detalhe="água, pesagem, check-in e os seus" ultimo />
           </Cartao>

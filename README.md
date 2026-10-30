@@ -52,6 +52,7 @@ preciso gerar um APK novo.
 - [x] Cálculos: metabolismo basal, gasto, déficit, média móvel, projeção, recalibração
 - [x] Leitura do Health Connect: passos, calorias, FC de repouso (ou estimada da frequência cardíaca contínua), sono, treinos, nutrição e peso (últimos 28 dias); ignora a estimativa própria do Health Connect para calorias totais sem app de origem
 - [x] Fontes escolhidas: em Mais, a pessoa ativa app por app (Zepp, Hevy, FatSecret, Strava...); só o que vem deles é lido, e desligar apaga os dados daquele app dos últimos 28 dias
+- [x] Atividades recorrentes: catálogo (lutas, corrida, esportes, academia, yoga…), dias, horário, duração e intensidade; a tela Hoje pergunta "Fiz / Não fiz" e um treino gravado pelo relógio no horário já conta como feito; avulsas pelo Revisar dia
 - [x] Modo escuro: seguir o celular, claro ou escuro (Mais → Aparência)
 - [ ] Dieta do FatSecret: entra pelo Health Connect se o FatSecret gravar nutrição lá (a confirmar no celular)
 - [x] Gráficos de progresso: peso com média, meta e projeção; déficit diário; resumo da semana; previsto × real

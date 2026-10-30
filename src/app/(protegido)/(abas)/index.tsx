@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { LIMITE_RITMO_PCT } from '@/lib/calculos';
 import { apagarAgua, carregarResumoDoDia, registrarAgua, type ResumoDoDia } from '@/lib/dados';
+import { CartaoAtividadesDoDia } from '@/components/atividades';
 import { dataPorExtenso, decimal, diaCurto, diaLocal, milhar } from '@/lib/datas';
 import { lerEstado, nomeDoApp, sincronizar, sincronizarSeLiberado, type EstadoSync } from '@/lib/healthconnect';
 import { cores } from '@/lib/tema';
@@ -172,6 +173,7 @@ export default function Hoje() {
 
         {resumo && <CartaoCheckin checkin={checkinHoje} alerta={alertaDeficitAgressivo(checkins)} aoMudar={mudarCheckin} />}
         {resumo && <CartaoSono ultima={noites.at(-1) ?? null} resumo={resumirSono(noites)} />}
+        <CartaoAtividadesDoDia dia={diaLocal()} ocultarSeVazio />
         {resumo && <CartaoTreino resumo={resumo} />}
         {resumo && <CartaoRelogio resumo={resumo} sync={sync} />}
         {resumo && <CartaoProjecao resumo={resumo} />}

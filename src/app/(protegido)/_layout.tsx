@@ -48,6 +48,9 @@ export default function LayoutProtegido() {
       <Stack.Screen name="exames/marcador/[codigo]" options={{ title: 'Histórico' }} />
       <Stack.Screen name="sono" options={{ title: 'Sono' }} />
       <Stack.Screen name="medida/[codigo]" options={{ title: 'Medida' }} />
+      <Stack.Screen name="atividades/index" options={{ title: 'Atividades' }} />
+      <Stack.Screen name="atividades/editar" options={{ title: 'Atividade recorrente' }} />
+      <Stack.Screen name="atividades/avulsa" options={{ title: 'Registrar atividade' }} />
       <Stack.Screen name="historico" options={{ title: 'Revisar dia' }} />
       <Stack.Screen name="boas-vindas" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>

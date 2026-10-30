@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Escala } from '@/components/bemestar';
+import { CartaoAtividadesDoDia } from '@/components/atividades';
 import { Botao, Campo, Cartao, LinhaCampos, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
 import { salvarCheckin } from '@/lib/bemestar-dados';
 import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, corrigirDieta, registrarAgua, removerCorrecaoDieta, type RegistrosDoDia } from '@/lib/dados';
@@ -291,6 +292,8 @@ export default function Historico() {
         <Escala campo="fome" valor={r?.checkin?.fome ?? null} aoEscolher={(v) => mudarCheckin('fome', v)} />
         <Escala campo="humor" valor={r?.checkin?.humor ?? null} aoEscolher={(v) => mudarCheckin('humor', v)} />
       </Cartao>
+
+      <CartaoAtividadesDoDia dia={dia} />
 
       {/* Dieta */}
       <Cartao estilo={{ gap: 8 }}>
