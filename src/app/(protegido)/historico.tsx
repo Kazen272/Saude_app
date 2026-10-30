@@ -3,9 +3,9 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Escala } from '@/components/bemestar';
-import { Botao, Campo, Cartao, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
+import { Botao, Campo, Cartao, LinhaCampos, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
 import { salvarCheckin } from '@/lib/bemestar-dados';
-import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, registrarAgua, type RegistrosDoDia } from '@/lib/dados';
+import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, corrigirDieta, registrarAgua, removerCorrecaoDieta, type RegistrosDoDia } from '@/lib/dados';
 import { decimal, diaLocal, milhar, nomeDoDia, numeroCurto } from '@/lib/datas';
 import { sincronizar } from '@/lib/healthconnect';
 import { COLUNAS_EXTRAS, type Valores } from '@/lib/medidas';
@@ -22,10 +22,15 @@ export default function Historico() {
   const setDia = (d: string) => {
     setDiaBruto(d);
     setErroAgua(null);
+    setEditandoDieta(false);
   };
   const [adicionando, setAdicionando] = useState(false);
   const [erroAgua, setErroAgua] = useState<string | null>(null);
   const [sincronizando, setSincronizando] = useState(false);
+  const [editandoDieta, setEditandoDieta] = useState(false);
+  const [formDieta, setFormDieta] = useState({ kcal: '', proteina: '', carbo: '', gordura: '' });
+  const [erroDieta, setErroDieta] = useState<string | null>(null);
+  const [salvandoDieta, setSalvandoDieta] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -91,6 +96,63 @@ export default function Historico() {
     }
     setOutraQtd('');
     adicionarAgua(ml);
+  }
+
+  type FormDieta = { kcal: string; proteina: string; carbo: string; gordura: string };
+  const texto = (n: number | null | undefined) => (n == null ? '' : String(Math.round(n * 10) / 10).replace('.', ','));
+  function abrirCorrecao() {
+    setErroDieta(null);
+    setFormDieta({
+      kcal: r?.dieta ? String(r.dieta.kcal) : '',
+      proteina: texto(r?.dieta?.proteina),
+      carbo: texto(r?.dieta?.carbo),
+      gordura: texto(r?.dieta?.gordura),
+    });
+    setEditandoDieta(true);
+  }
+  const mudarForm = (campo: keyof FormDieta, t: string) =>
+    setFormDieta((f) => ({ ...f, [campo]: campo === 'kcal' ? t.replace(/\D/g, '').slice(0, 5) : t.replace(/[^\d,.]/g, '').slice(0, 6) }));
+
+  async function salvarDieta() {
+    const kcal = Number(formDieta.kcal);
+    const g = (t: string) => {
+      if (!t.trim()) return null;
+      const n = Number(t.replace(',', '.'));
+      return Number.isFinite(n) && n >= 0 && n <= 2000 ? n : NaN;
+    };
+    const macros = { proteina: g(formDieta.proteina), carbo: g(formDieta.carbo), gordura: g(formDieta.gordura) };
+    if (!formDieta.kcal || !(kcal > 0 && kcal <= 15000)) {
+      setErroDieta('Digite o total do dia em kcal, como 2350.');
+      return;
+    }
+    if (Object.values(macros).some((v) => Number.isNaN(v))) {
+      setErroDieta('Macros em gramas, só números (ex.: 120,5).');
+      return;
+    }
+    setSalvandoDieta(true);
+    try {
+      await corrigirDieta(dia, { kcal, ...macros });
+      setEditandoDieta(false);
+      await carregar();
+    } catch {
+      setErroDieta('Não foi possível salvar. Confira a internet.');
+    } finally {
+      setSalvandoDieta(false);
+    }
+  }
+
+  async function desfazerCorrecao() {
+    setSincronizando(true);
+    try {
+      await removerCorrecaoDieta(dia);
+      const e = await sincronizar();
+      if (e.erro) setErro(e.erro);
+      await carregar();
+    } catch {
+      setErro('Não foi possível desfazer a correção.');
+    } finally {
+      setSincronizando(false);
+    }
   }
 
   async function sincronizarDieta() {
@@ -232,9 +294,13 @@ export default function Historico() {
 
       {/* Dieta */}
       <Cartao estilo={{ gap: 8 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Rotulo>Dieta (FatSecret)</Rotulo>
-          {r?.dieta && <Text style={{ fontSize: 12, color: cores.cinza }}>lida às {r.dieta.lidaEm}</Text>}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <Rotulo>Dieta do dia</Rotulo>
+          {r?.dieta && (
+            <Text style={{ fontSize: 12, color: r.dieta.corrigida ? cores.verdeTexto : cores.cinza, fontWeight: r.dieta.corrigida ? '700' : '400' }}>
+              {r.dieta.corrigida ? 'corrigida por você' : r.dieta.lidaEm ? `FatSecret · lida às ${r.dieta.lidaEm}` : 'FatSecret'}
+            </Text>
+          )}
         </View>
         {r?.dieta ? (
           <>
@@ -246,14 +312,39 @@ export default function Historico() {
                 r.dieta.gordura != null ? `gordura ${Math.round(r.dieta.gordura)} g` : null,
               ]
                 .filter(Boolean)
-                .join(' · ')}
+                .join(' · ') || 'sem macros'}
             </Text>
           </>
         ) : (
           <Nota>Nenhuma refeição deste dia chegou do Health Connect.</Nota>
         )}
-        <Nota>Lançou ou corrigiu uma refeição no FatSecret? Ela chega quando o FatSecret envia ao Health Connect; depois toque em Sincronizar para trazer.</Nota>
-        <Botao titulo="Sincronizar agora" variante="suave" aoTocar={sincronizarDieta} ocupado={sincronizando} />
+
+        {editandoDieta ? (
+          <View style={{ gap: 10, paddingTop: 4 }}>
+            <Campo rotulo="Total do dia (kcal)" value={formDieta.kcal} onChangeText={(t) => mudarForm('kcal', t)} keyboardType="number-pad" placeholder="ex.: 4614" />
+            <LinhaCampos>
+              <Campo rotulo="Proteína (g)" value={formDieta.proteina} onChangeText={(t) => mudarForm('proteina', t)} keyboardType="decimal-pad" />
+              <Campo rotulo="Carbo (g)" value={formDieta.carbo} onChangeText={(t) => mudarForm('carbo', t)} keyboardType="decimal-pad" />
+              <Campo rotulo="Gordura (g)" value={formDieta.gordura} onChangeText={(t) => mudarForm('gordura', t)} keyboardType="decimal-pad" />
+            </LinhaCampos>
+            <Nota>Copie o resumo do dia no FatSecret. Macros são opcionais. A correção vale no lugar do que vier do Health Connect.</Nota>
+            {erroDieta && <Text style={{ fontSize: 13, fontWeight: '700', color: cores.laranja }}>{erroDieta}</Text>}
+            <Botao titulo="Salvar correção" aoTocar={salvarDieta} ocupado={salvandoDieta} />
+            <Botao titulo="Cancelar" variante="suave" aoTocar={() => setEditandoDieta(false)} desativado={salvandoDieta} />
+          </View>
+        ) : (
+          <>
+            <Botao titulo={r?.dieta?.corrigida ? 'Editar correção' : 'Corrigir total do dia'} variante="suave" aoTocar={abrirCorrecao} />
+            {r?.dieta?.corrigida ? (
+              <Botao titulo="Voltar a usar o FatSecret" variante="suave" aoTocar={desfazerCorrecao} ocupado={sincronizando} />
+            ) : (
+              <>
+                <Nota>Refeição lançada no FatSecret para um dia anterior não chega ao Health Connect: use “Corrigir total do dia”. Lançamentos de hoje chegam ao sincronizar.</Nota>
+                <Botao titulo="Sincronizar agora" variante="suave" aoTocar={sincronizarDieta} ocupado={sincronizando} />
+              </>
+            )}
+          </>
+        )}
       </Cartao>
 
       <Nota>Treinos, passos e dieta vêm do Health Connect: para corrigir, ajuste no app de origem (Hevy, relógio ou FatSecret).</Nota>

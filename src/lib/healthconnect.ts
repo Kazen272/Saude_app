@@ -395,8 +395,18 @@ async function executarSincronizacao(): Promise<EstadoSync> {
         ...filtroOrigens(),
       });
       const g = (m?: { inGrams?: number }) => (m?.inGrams != null ? Math.round(m.inGrams * 10) / 10 : null);
+      // Dias corrigidos à mão na tela Revisar dia não são sobrescritos.
+      const { data: corrigidos, error: erroCorrigidos } = await supabase
+        .from('nutrition_days')
+        .select('day')
+        .eq('user_id', uid)
+        .eq('source', 'manual')
+        .gte('day', inicioDia);
+      if (erroCorrigidos) throw erroCorrigidos;
+      const diasCorrigidos = new Set((corrigidos ?? []).map((c) => c.day as string));
       const linhas = grupos
         .filter((x) => (x.result.ENERGY_TOTAL?.inKilocalories ?? 0) > 0)
+        .filter((x) => !diasCorrigidos.has(diaDoGrupo(x.startTime)))
         .map((x) => ({
           user_id: uid,
           day: diaDoGrupo(x.startTime),

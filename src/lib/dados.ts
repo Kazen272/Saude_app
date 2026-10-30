@@ -129,7 +129,7 @@ export type RegistrosDoDia = {
   sono: { origem: string; deitou: string; acordou: string; qualidade: number | null }[];
   checkin: { energia: number | null; fome: number | null; humor: number | null } | null;
   /** Dieta do dia como chegou do Health Connect (FatSecret), com a hora da última leitura. */
-  dieta: { kcal: number; proteina: number | null; carbo: number | null; gordura: number | null; lidaEm: string } | null;
+  dieta: { kcal: number; proteina: number | null; carbo: number | null; gordura: number | null; lidaEm: string; corrigida: boolean } | null;
 };
 
 const hhmm = (iso: string) => {
@@ -146,7 +146,7 @@ export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDi
     supabase.from('water_entries').select('id, amount_ml, logged_at').gte('logged_at', inicio).lt('logged_at', fim).order('logged_at'),
     supabase.from('sleep_sessions').select('bed_at, wake_at, quality, source').eq('night', dia),
     supabase.from('daily_checkins').select('energy, hunger, mood').eq('day', dia).maybeSingle(),
-    supabase.from('nutrition_days').select('kcal, protein_g, carbs_g, fat_g, synced_at').eq('day', dia).maybeSingle(),
+    supabase.from('nutrition_days').select('kcal, protein_g, carbs_g, fat_g, synced_at, source').eq('day', dia).maybeSingle(),
   ]);
   for (const r of [corpo, agua, sono, checkin, dieta]) if (r.error) throw r.error;
   const corpoLinha = corpo.data as unknown as Record<string, unknown> | null;
@@ -166,13 +166,14 @@ export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDi
       qualidade: (x.quality as number | null) ?? null,
     })),
     dieta:
-      dieta.data && Number(dieta.data.kcal) > 0
+      dieta.data && (Number(dieta.data.kcal) > 0 || dieta.data.source === 'manual')
         ? {
             kcal: Number(dieta.data.kcal),
             proteina: num(dieta.data.protein_g),
             carbo: num(dieta.data.carbs_g),
             gordura: num(dieta.data.fat_g),
-            lidaEm: hhmm(dieta.data.synced_at as string),
+            lidaEm: dieta.data.synced_at ? hhmm(dieta.data.synced_at as string) : '',
+            corrigida: dieta.data.source === 'manual',
           }
         : null,
     checkin: checkin.data ? { energia: checkin.data.energy as number | null, fome: checkin.data.hunger as number | null, humor: checkin.data.mood as number | null } : null,
@@ -587,4 +588,35 @@ export async function carregarMedidas(): Promise<RegistroMedidas[]> {
   return ((data ?? []) as unknown as Record<string, unknown>[])
     .map((r) => ({ dia: r.measured_on as string, valores: lerValores(r) }))
     .filter((r) => Object.values(r.valores).some((v) => v != null));
+}
+
+/**
+ * Corrige o total de um dia à mão (ex.: refeição lançada depois no FatSecret, que
+ * não chega ao Health Connect). A sincronização não sobrescreve um dia corrigido.
+ */
+export async function corrigirDieta(
+  dia: string,
+  v: { kcal: number; proteina: number | null; carbo: number | null; gordura: number | null },
+): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  const { error } = await supabase.from('nutrition_days').upsert(
+    {
+      user_id: u.user?.id,
+      day: dia,
+      kcal: Math.round(v.kcal),
+      protein_g: v.proteina,
+      carbs_g: v.carbo,
+      fat_g: v.gordura,
+      source: 'manual',
+      synced_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,day' },
+  );
+  if (error) throw error;
+}
+
+/** Desfaz a correção: o dia volta a usar o que vier do FatSecret na próxima sincronização. */
+export async function removerCorrecaoDieta(dia: string): Promise<void> {
+  const { error } = await supabase.from('nutrition_days').delete().eq('day', dia).eq('source', 'manual');
+  if (error) throw error;
 }
