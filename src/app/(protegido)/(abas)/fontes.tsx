@@ -6,9 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CartaoHealthConnect } from '@/components/healthconnect';
 import { FormularioPerfil } from '@/components/perfil';
 import { Botao, Cabecalho, Cartao, estilos } from '@/components/ui';
-import { useAparencia } from '@/lib/aparencia';
+import { useAparencia, type Preferencia } from '@/lib/aparencia';
 import { supabase } from '@/lib/supabase';
-import { cores, type Esquema } from '@/lib/tema';
+import { cores } from '@/lib/tema';
 
 export default function Fontes() {
   return (
@@ -73,12 +73,13 @@ function ItemMenu({
 }
 
 function CartaoAparencia() {
-  const { esquema, definir } = useAparencia();
-  const escolher = (e: Esquema) => {
-    if (e === esquema) return;
-    definir(e);
-    // A troca remonta o app; volta para esta aba.
-    setTimeout(() => router.navigate('/fontes'), 50);
+  const { preferencia, esquema, definir } = useAparencia();
+  const escolher = (p: Preferencia) => {
+    if (p === preferencia) return;
+    const novo = p === 'sistema' ? null : p;
+    definir(p);
+    // Se o esquema mudar, o app remonta: volta para esta aba.
+    if (novo !== esquema) setTimeout(() => router.navigate('/fontes'), 50);
   };
   return (
     <Cartao estilo={{ gap: 10 }}>
@@ -86,11 +87,12 @@ function CartaoAparencia() {
       <View style={{ flexDirection: 'row', gap: 4, backgroundColor: cores.segmento, borderRadius: 12, padding: 4 }}>
         {(
           [
+            ['sistema', 'Celular', 'phone-portrait-outline'],
             ['claro', 'Claro', 'sunny-outline'],
             ['escuro', 'Escuro', 'moon-outline'],
           ] as const
         ).map(([e, nome, icone]) => {
-          const ativo = esquema === e;
+          const ativo = preferencia === e;
           return (
             <Pressable
               key={e}
@@ -105,6 +107,7 @@ function CartaoAparencia() {
           );
         })}
       </View>
+      {preferencia === 'sistema' && <Text style={{ fontSize: 12, color: cores.cinza }}>Segue o modo escuro do Android (agora: {esquema}).</Text>}
     </Cartao>
   );
 }

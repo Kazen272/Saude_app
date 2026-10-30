@@ -10,6 +10,7 @@ import {
   lerEstado,
   nomeDoApp,
   pedirPermissoes,
+  PERMISSOES,
   permissoesConcedidas,
   sincronizar,
   type Disponibilidade,
@@ -106,7 +107,7 @@ export function CartaoHealthConnect() {
         <View style={{ flex: 1, gap: 2 }}>
           <Rotulo>Health Connect</Rotulo>
           <Text style={{ fontSize: 12, color: cores.cinza }}>
-            {conectado ? `${liberadas} de 8 tipos de dado liberados · leitura ${quandoFoi(estado?.ultimaSync ?? null)}` : 'Ainda não conectado'}
+            {conectado ? `${liberadas} de ${PERMISSOES.length} tipos de dado liberados · leitura ${quandoFoi(estado?.ultimaSync ?? null)}` : 'Ainda não conectado'}
           </Text>
         </View>
         <Pilula texto={conectado ? 'Conectado' : 'Desligado'} tom={conectado ? 'verde' : 'cinza'} />
@@ -145,7 +146,13 @@ export function CartaoHealthConnect() {
 
       {conectado ? (
         <>
-          <Botao titulo="Sincronizar agora" aoTocar={sincronizarAgora} ocupado={ocupado} />
+          {liberadas < PERMISSOES.length && (
+            <>
+              <Nota>Há tipos de dado novos para liberar (ex.: frequência cardíaca).</Nota>
+              <Botao titulo="Liberar os tipos que faltam" aoTocar={conectar} ocupado={ocupado} />
+            </>
+          )}
+          <Botao titulo="Sincronizar agora" variante={liberadas < PERMISSOES.length ? 'suave' : 'principal'} aoTocar={sincronizarAgora} ocupado={ocupado} />
           <Botao titulo="Gerenciar permissões" variante="suave" aoTocar={abrirConfiguracoes} desativado={ocupado} />
         </>
       ) : (

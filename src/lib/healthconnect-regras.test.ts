@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { minutosDormindo, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia } from './healthconnect-regras.ts';
+import { fcRepousoDasAmostras, minutosDormindo, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia } from './healthconnect-regras.ts';
 
 // Os testes rodam com TZ=America/Sao_Paulo (ver package.json), como o celular.
 
@@ -68,5 +68,24 @@ describe('treinos', () => {
     const a = { inicio: '2026-10-28T10:00:00Z', fim: '2026-10-28T11:00:00Z' };
     assert.equal(treinosDuplicados(a, { inicio: '2026-10-28T10:04:00Z', fim: '2026-10-28T10:58:00Z' }), true);
     assert.equal(treinosDuplicados(a, { inicio: '2026-10-28T18:00:00Z', fim: '2026-10-28T19:00:00Z' }), false);
+  });
+});
+
+describe('fcRepousoDasAmostras', () => {
+  it('menor média de 30 min com 3+ amostras, por dia local', () => {
+    const a = (iso: string, valor: number) => ({ quando: iso, valor });
+    const r = fcRepousoDasAmostras([
+      // 30/10 madrugada (horário de Brasília = UTC-3): janela calma
+      a('2026-10-30T07:00:00Z', 58), a('2026-10-30T07:10:00Z', 56), a('2026-10-30T07:20:00Z', 57),
+      // pico isolado com poucas amostras não conta
+      a('2026-10-30T08:00:00Z', 40), a('2026-10-30T08:05:00Z', 42),
+      // tarde, mais alta
+      a('2026-10-30T18:00:00Z', 80), a('2026-10-30T18:10:00Z', 84), a('2026-10-30T18:20:00Z', 82),
+      // 02:30 UTC do dia 31 = 23:30 do dia 30 em Brasília
+      a('2026-10-31T02:31:00Z', 70), a('2026-10-31T02:40:00Z', 70), a('2026-10-31T02:50:00Z', 70),
+      // leitura inválida
+      a('2026-10-30T07:25:00Z', 0),
+    ]);
+    assert.deepEqual([...r.entries()], [['2026-10-30', 57]]);
   });
 });

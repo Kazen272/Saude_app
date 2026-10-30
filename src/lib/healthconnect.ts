@@ -18,7 +18,7 @@ import {
 } from 'react-native-health-connect';
 
 import { diaLocal, somarDias } from './datas';
-import { diaDoGrupo, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia, type SonoBruto } from './healthconnect-regras';
+import { diaDoGrupo, fcRepousoDasAmostras, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia, type SonoBruto } from './healthconnect-regras';
 import { supabase } from './supabase';
 
 const DIAS = 28;
@@ -29,6 +29,7 @@ const TIPOS: RecordType[] = [
   'ActiveCaloriesBurned',
   'TotalCaloriesBurned',
   'RestingHeartRate',
+  'HeartRate',
   'SleepSession',
   'ExerciseSession',
   'Nutrition',
@@ -157,8 +158,11 @@ async function somaPorDia(tipo: 'Steps' | 'ActiveCaloriesBurned' | 'TotalCalorie
       tipo === 'Steps'
         ? Number(r.COUNT_TOTAL ?? 0)
         : Number((r[tipo === 'ActiveCaloriesBurned' ? 'ACTIVE_CALORIES_TOTAL' : 'ENERGY_TOTAL'] as { inKilocalories?: number } | undefined)?.inKilocalories ?? 0);
+    // Sem nenhum app de origem, o Health Connect devolve uma estimativa própria
+    // (calorias totais = basal padrão, ex.: 1.565 todo dia). Isso não é medição.
+    if (!r.dataOrigins?.length) continue;
     if (valor > 0) porDia.set(diaDoGrupo(g.startTime), Math.round(valor));
-    r.dataOrigins?.forEach((o) => origens.add(o));
+    r.dataOrigins.forEach((o) => origens.add(o));
   }
   return { porDia, origens };
 }
@@ -193,14 +197,22 @@ async function executarSincronizacao(): Promise<EstadoSync> {
 
     // --- Atividade do dia: passos, calorias, FC de repouso, minutos de sono ---
     const vazio = { porDia: new Map<string, number>(), origens: new Set<string>() };
+    const origensFc = new Set<string>();
     const [passos, ativas, totais] = await Promise.all([
       tem(concedidas, 'Steps') ? somaPorDia('Steps', inicio) : vazio,
       tem(concedidas, 'ActiveCaloriesBurned') ? somaPorDia('ActiveCaloriesBurned', inicio) : vazio,
       tem(concedidas, 'TotalCaloriesBurned') ? somaPorDia('TotalCaloriesBurned', inicio) : vazio,
     ]);
+    // FC de repouso: a do relógio quando ele grava; senão, estimada das amostras contínuas.
     const fcRepouso = tem(concedidas, 'RestingHeartRate')
       ? ultimoPorDia((await lerTodos('RestingHeartRate', inicio)).map((r) => ({ quando: r.time, valor: r.beatsPerMinute })))
       : new Map<string, number>();
+    if (tem(concedidas, 'HeartRate')) {
+      const registrosFc = await lerTodos('HeartRate', inicio);
+      const estimada = fcRepousoDasAmostras(registrosFc.flatMap((r) => r.samples.map((x) => ({ quando: x.time, valor: x.beatsPerMinute }))));
+      for (const [dia, bpm] of estimada) if (!fcRepouso.has(dia)) fcRepouso.set(dia, bpm);
+      registrosFc.forEach((r) => r.metadata?.dataOrigin && origensFc.add(r.metadata.dataOrigin));
+    }
 
     const sonoBruto: SonoBruto[] = tem(concedidas, 'SleepSession')
       ? (await lerTodos('SleepSession', inicioDaJanela(DIAS + 1))).map((r) => ({
@@ -246,7 +258,7 @@ async function executarSincronizacao(): Promise<EstadoSync> {
       const { error } = await supabase.from('daily_activity').upsert(linhasAtividade, { onConflict: 'user_id,day' });
       if (error) throw error;
     }
-    estado.origens.atividade = [...new Set([...passos.origens, ...ativas.origens, ...totais.origens])];
+    estado.origens.atividade = [...new Set([...passos.origens, ...ativas.origens, ...totais.origens, ...origensFc])];
     estado.contagem.dias = linhasAtividade.length;
 
     // --- Sono: uma sessão por noite (o manual continua valendo por cima) ---

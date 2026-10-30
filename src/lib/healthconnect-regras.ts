@@ -128,3 +128,30 @@ export function treinosDuplicados(a: { inicio: string; fim: string }, b: { inici
 export function temDadoDeDieta(origens: string[]): boolean {
   return origens.length > 0;
 }
+
+/**
+ * FC de repouso estimada a partir das amostras contínuas do relógio (para apps
+ * que gravam "Frequência cardíaca" mas não "FC de repouso", como o Zepp):
+ * média de cada janela de 30 min com 3+ amostras; o repouso do dia é a menor delas.
+ */
+export function fcRepousoDasAmostras(amostras: MedidaInstantanea[]): Map<string, number> {
+  const janelas = new Map<string, { dia: string; soma: number; n: number }>();
+  for (const a of amostras) {
+    if (!(a.valor >= 30 && a.valor <= 220)) continue;
+    const t = new Date(a.quando);
+    const dia = diaLocal(t);
+    const chave = `${dia}|${t.getHours()}|${t.getMinutes() < 30 ? 0 : 1}`;
+    const j = janelas.get(chave) ?? { dia, soma: 0, n: 0 };
+    j.soma += a.valor;
+    j.n += 1;
+    janelas.set(chave, j);
+  }
+  const porDia = new Map<string, number>();
+  for (const j of janelas.values()) {
+    if (j.n < 3) continue;
+    const media = Math.round(j.soma / j.n);
+    const atual = porDia.get(j.dia);
+    if (atual == null || media < atual) porDia.set(j.dia, media);
+  }
+  return porDia;
+}

@@ -6,7 +6,7 @@
     "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kazen272.saudeapp"
@@ -25,6 +25,7 @@
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
         "android.permission.health.READ_TOTAL_CALORIES_BURNED",
         "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_SLEEP",
         "android.permission.health.READ_EXERCISE",
         "android.permission.health.READ_NUTRITION",
