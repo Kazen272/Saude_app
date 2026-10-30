@@ -3,9 +3,9 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Escala } from '@/components/bemestar';
-import { Cartao, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
+import { Botao, Campo, Cartao, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
 import { salvarCheckin } from '@/lib/bemestar-dados';
-import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, type RegistrosDoDia } from '@/lib/dados';
+import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, registrarAgua, type RegistrosDoDia } from '@/lib/dados';
 import { decimal, diaLocal, nomeDoDia, numeroCurto } from '@/lib/datas';
 import { COLUNAS_EXTRAS, type Valores } from '@/lib/medidas';
 import { cores } from '@/lib/tema';
@@ -14,9 +14,16 @@ const extras = (v: Valores) => COLUNAS_EXTRAS.filter((c) => v[c] != null).length
 
 export default function Historico() {
   const params = useLocalSearchParams<{ dia?: string }>();
-  const [dia, setDia] = useState(params.dia && /^\d{4}-\d{2}-\d{2}$/.test(params.dia) ? params.dia : diaLocal());
+  const [dia, setDiaBruto] = useState(params.dia && /^\d{4}-\d{2}-\d{2}$/.test(params.dia) ? params.dia : diaLocal());
   const [r, setR] = useState<RegistrosDoDia | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [outraQtd, setOutraQtd] = useState('');
+  const setDia = (d: string) => {
+    setDiaBruto(d);
+    setErroAgua(null);
+  };
+  const [adicionando, setAdicionando] = useState(false);
+  const [erroAgua, setErroAgua] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -61,12 +68,36 @@ export default function Historico() {
     }
   }
 
+  async function adicionarAgua(ml: number) {
+    setErroAgua(null);
+    setAdicionando(true);
+    try {
+      await registrarAgua(ml, dia);
+      await carregar();
+    } catch {
+      setErroAgua('Não foi possível salvar a água.');
+    } finally {
+      setAdicionando(false);
+    }
+  }
+
+  function adicionarOutra() {
+    const ml = Number(outraQtd);
+    if (!ml || ml < 50 || ml > 5000) {
+      setErroAgua('Digite a água em ml, entre 50 e 5000.');
+      return;
+    }
+    setOutraQtd('');
+    adicionarAgua(ml);
+  }
+
+  const ehHoje = dia === diaLocal();
   const totalAgua = r?.agua.reduce((s, a) => s + a.ml, 0) ?? 0;
   const sonoManual = r?.sono.find((s) => s.origem === 'manual');
   const sonoRelogio = r?.sono.find((s) => s.origem !== 'manual');
 
   return (
-    <ScrollView contentContainerStyle={[estilos.conteudo, { paddingTop: 8 }]}>
+    <ScrollView contentContainerStyle={[estilos.conteudo, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
       <Cartao estilo={{ paddingVertical: 8 }}>
         <SeletorDia dia={dia} aoMudar={setDia} />
       </Cartao>
@@ -108,6 +139,37 @@ export default function Historico() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Rotulo>Água</Rotulo>
           <Text style={{ fontSize: 13, fontWeight: '700', color: cores.azulEscuro }}>{numeroCurto(totalAgua / 1000)} L</Text>
+        </View>
+        <View style={{ gap: 8, paddingBottom: 6 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tintaSuave }}>{ehHoje ? 'Adicionar agora' : 'Adicionar a este dia'}</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {[250, 500, 1000].map((ml) => (
+              <View key={ml} style={{ flex: 1 }}>
+                <Botao
+                  titulo={ml === 1000 ? '+ 1 L' : `+ ${ml} ml`}
+                  variante="agua"
+                  aoTocar={() => adicionarAgua(ml)}
+                  desativado={adicionando}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+            <View style={{ flex: 1 }}>
+              <Campo
+                rotulo="Outra quantidade (ml)"
+                value={outraQtd}
+                onChangeText={(t) => setOutraQtd(t.replace(/\D/g, '').slice(0, 4))}
+                keyboardType="number-pad"
+                placeholder="ex.: 1500"
+                onSubmitEditing={adicionarOutra}
+              />
+            </View>
+            <View style={{ width: 112 }}>
+              <Botao titulo="Adicionar" variante="suave" aoTocar={adicionarOutra} ocupado={adicionando} />
+            </View>
+          </View>
+          {erroAgua && <Text style={{ fontSize: 13, fontWeight: '700', color: cores.laranja }}>{erroAgua}</Text>}
         </View>
         {r?.agua.length ? (
           r.agua.map((a) => (
