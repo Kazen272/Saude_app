@@ -269,6 +269,8 @@ function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades
       // Dia completo com total baixo demais = relógio fora do pulso parte do dia.
       confiarNoTotal: tipico != null && (dia === hoje || (a?.total_kcal ?? 0) >= tmb * 0.6),
       tetoTipico: tipico,
+      passos: a?.steps ?? null,
+      pesoKg: pesoRefKg,
     });
   };
 }
@@ -479,6 +481,8 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
           fracaoDoDia: fracaoDoDia(agora.getHours() * 60 + agora.getMinutes()),
           consumoKcal: balancoHoje.consumo,
           gastoTipicoRelogio: tipicoDoRelogio(historico.atividades, tmb, hoje),
+          passos: atividadeHoje?.steps ?? null,
+          pesoKg: analise.pesoRef,
         });
 
   return {

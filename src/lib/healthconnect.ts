@@ -18,7 +18,7 @@ import {
 } from 'react-native-health-connect';
 
 import { diaLocal, somarDias } from './datas';
-import { diaDoGrupo, fcRepousoDasAmostras, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia, type SonoBruto } from './healthconnect-regras';
+import { diaDoGrupo, fcRepousoDasAmostras, totaisPorDia, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia, type SonoBruto } from './healthconnect-regras';
 import { supabase } from './supabase';
 
 const DIAS = 28;
@@ -43,7 +43,7 @@ export type EstadoSync = {
   ultimaSync: string | null;
   /** Apps que escreveram cada tipo de dado na última leitura. */
   origens: { atividade: string[]; sono: string[]; treinos: string[]; dieta: string[]; peso: string[] };
-  contagem: { dias: number; noites: number; treinos: number; diasDieta: number; pesagens: number };
+  contagem: { dias: number; noites: number; treinos: number; diasDieta: number; pesagens: number; amostrasFc?: number; diasFc?: number };
   /** Horário do dado mais recente do relógio que chegou ao Health Connect. */
   ultimoDadoRelogio: string | null;
   /** Apps que gravam no Health Connect (ativados ou não) e o que cada um grava. */
@@ -256,7 +256,12 @@ async function executarSincronizacao(): Promise<EstadoSync> {
     const [passos, ativas, totais] = await Promise.all([
       tem(concedidas, 'Steps') ? somaPorDia('Steps', inicio) : vazio,
       tem(concedidas, 'ActiveCaloriesBurned') ? somaPorDia('ActiveCaloriesBurned', inicio) : vazio,
-      tem(concedidas, 'TotalCaloriesBurned') ? somaPorDia('TotalCaloriesBurned', inicio) : vazio,
+      tem(concedidas, 'TotalCaloriesBurned')
+        ? lerTodos('TotalCaloriesBurned', inicio).then((rs) => ({
+            porDia: totaisPorDia(rs.map((r) => ({ inicio: r.startTime, kcal: r.energy.inKilocalories, origem: r.metadata?.dataOrigin ?? null }))),
+            origens: new Set(rs.map((r) => r.metadata?.dataOrigin).filter((o): o is string => !!o)),
+          }))
+        : vazio,
     ]);
     // FC de repouso: a do relógio quando ele grava; senão, estimada das amostras contínuas.
     const fcRepouso = tem(concedidas, 'RestingHeartRate')
@@ -267,6 +272,8 @@ async function executarSincronizacao(): Promise<EstadoSync> {
       const estimada = fcRepousoDasAmostras(registrosFc.flatMap((r) => r.samples.map((x) => ({ quando: x.time, valor: x.beatsPerMinute }))));
       for (const [dia, bpm] of estimada) if (!fcRepouso.has(dia)) fcRepouso.set(dia, bpm);
       registrosFc.forEach((r) => r.metadata?.dataOrigin && origensFc.add(r.metadata.dataOrigin));
+      estado.contagem.amostrasFc = registrosFc.reduce((n, r) => n + r.samples.length, 0);
+      estado.contagem.diasFc = estimada.size;
     }
 
     const sonoBruto: SonoBruto[] = tem(concedidas, 'SleepSession')

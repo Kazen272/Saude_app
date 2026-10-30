@@ -174,6 +174,14 @@ export function CartaoHealthConnect() {
               })}
             </View>
           )}
+          {ativos && ativos.length > 0 && estado?.ultimaSync && (
+            <Text style={{ fontSize: 12, color: cores.cinza }}>
+              Última leitura: {estado.contagem.dias} dias de atividade · {estado.contagem.noites} noites · {estado.contagem.treinos} treinos · {estado.contagem.diasDieta} dias de dieta ·{' '}
+              {estado.contagem.amostrasFc == null
+                ? 'frequência cardíaca não liberada'
+                : `${estado.contagem.amostrasFc} medições de frequência cardíaca (${estado.contagem.diasFc ?? 0} dias com repouso)`}
+            </Text>
+          )}
           {erroFontes && <Text style={{ fontSize: 13, fontWeight: '600', color: cores.laranja }}>{erroFontes}</Text>}
           <Nota>Desligar um app apaga do Saúde os dados dele dos últimos 28 dias (nada muda no app nem no Health Connect). Não achou um app? Ative o Health Connect dentro dele (Hevy, FatSecret, Strava, Zepp...) e toque em Sincronizar.</Nota>
         </View>

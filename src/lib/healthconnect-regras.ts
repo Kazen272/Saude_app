@@ -155,6 +155,40 @@ export function fcRepousoDasAmostras(amostras: MedidaInstantanea[]): Map<string,
     const atual = porDia.get(j.dia);
     if (atual == null || media < atual) porDia.set(j.dia, media);
   }
+  // Relógio que mede de tempos em tempos (ex.: a cada 30 min) não enche janelas:
+  // nesses dias, usa a média das 10% menores medições (mínimo 3), com 6+ medições no dia.
+  const amostrasPorDia = new Map<string, number[]>();
+  for (const a of amostras) {
+    if (!(a.valor >= 30 && a.valor <= 220)) continue;
+    const dia = diaLocal(new Date(a.quando));
+    if (!amostrasPorDia.has(dia)) amostrasPorDia.set(dia, []);
+    amostrasPorDia.get(dia)?.push(a.valor);
+  }
+  for (const [dia, valores] of amostrasPorDia) {
+    if (porDia.has(dia) || valores.length < 6) continue;
+    const menores = [...valores].sort((x, y) => x - y).slice(0, Math.max(3, Math.round(valores.length * 0.1)));
+    porDia.set(dia, Math.round(menores.reduce((s, v) => s + v, 0) / menores.length));
+  }
+  return porDia;
+}
+
+/**
+ * Calorias totais por dia somando os registros gravados pelos apps (não a agregação
+ * do Health Connect, que preenche dias sem dado com um basal padrão, ex.: 1.565).
+ * Se mais de um app grava, vale o maior total do dia.
+ */
+export function totaisPorDia(registros: { inicio: string; kcal: number; origem: string | null }[]): Map<string, number> {
+  const porDiaEOrigem = new Map<string, number>();
+  for (const r of registros) {
+    if (!(r.kcal > 0)) continue;
+    const chave = `${diaLocal(new Date(r.inicio))}|${r.origem ?? ''}`;
+    porDiaEOrigem.set(chave, (porDiaEOrigem.get(chave) ?? 0) + r.kcal);
+  }
+  const porDia = new Map<string, number>();
+  for (const [chave, kcal] of porDiaEOrigem) {
+    const dia = chave.split('|')[0];
+    porDia.set(dia, Math.max(porDia.get(dia) ?? 0, Math.round(kcal)));
+  }
   return porDia;
 }
 

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { descreverTipos, fcRepousoDasAmostras, minutosDormindo, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia } from './healthconnect-regras.ts';
+import { descreverTipos, fcRepousoDasAmostras, totaisPorDia, minutosDormindo, nomeDoApp, nomeDoTreino, noitesPorDia, treinosDuplicados, ultimoPorDia } from './healthconnect-regras.ts';
 
 // Os testes rodam com TZ=America/Sao_Paulo (ver package.json), como o celular.
 
@@ -95,5 +95,24 @@ describe('descreverTipos', () => {
     assert.equal(descreverTipos(['Steps', 'ActiveCaloriesBurned', 'TotalCaloriesBurned', 'HeartRate']), 'passos, calorias e frequência cardíaca');
     assert.equal(descreverTipos(['Nutrition']), 'dieta');
     assert.equal(descreverTipos([]), '');
+  });
+});
+
+describe('FC de repouso com poucas medições', () => {
+  it('sem janela com 3 medições, usa a média das menores do dia', () => {
+    const horas = [8, 9, 10, 11, 12, 13, 14, 15].map((h, i) => ({ quando: `2026-10-30T${String(h + 3).padStart(2, '0')}:00:00Z`, valor: [62, 70, 75, 80, 64, 90, 66, 85][i] }));
+    assert.deepEqual([...fcRepousoDasAmostras(horas).entries()], [['2026-10-30', 64]]);
+  });
+});
+
+describe('totaisPorDia', () => {
+  it('soma registros por dia e app; com dois apps vale o maior', () => {
+    const r = totaisPorDia([
+      { inicio: '2026-10-30T03:30:00Z', kcal: 500, origem: 'zepp' },
+      { inicio: '2026-10-30T15:00:00Z', kcal: 700, origem: 'zepp' },
+      { inicio: '2026-10-30T15:00:00Z', kcal: 900, origem: 'outro' },
+      { inicio: '2026-10-30T02:00:00Z', kcal: 400, origem: 'zepp' }, // 23h do dia 29 em Brasília
+    ]);
+    assert.deepEqual([...r.entries()].sort(), [['2026-10-29', 400], ['2026-10-30', 1200]]);
   });
 });

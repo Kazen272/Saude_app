@@ -206,3 +206,10 @@ describe('gasto: relógio primeiro', () => {
     assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55 }).kcal, 3178);
   });
 });
+
+describe('gasto pelos passos', () => {
+  it('sem calorias do relógio, passos viram atividade (0,04 kcal/passo a cada 70 kg)', () => {
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105 }).kcal, 2650);
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105, kcalAtivas: 300 }).kcal, 2350);
+  });
+});
