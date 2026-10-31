@@ -268,11 +268,21 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
             {deficitHoje == null ? (consumoKcal == null ? 'aguardando a dieta' : '—') : textoBalanco(deficitHoje)}
           </Text>
         </View>
-        <LinhaBalanco titulo="Consumido · dieta" valor={consumoKcal} fracao={(consumoKcal ?? 0) / maior} cor={cores.laranjaVivo} />
+        {/* Consumo contra a meta do dia; gasto contra o previsto para o dia inteiro. */}
+        <LinhaBalanco
+          titulo="Comido · dieta"
+          valor={consumoKcal}
+          referencia={meta?.kcal ?? null}
+          rotuloReferencia="da meta"
+          fracao={(consumoKcal ?? 0) / (meta?.kcal ?? maior)}
+          cor={cores.laranjaVivo}
+        />
         <LinhaBalanco
           titulo={gasto?.origem === 'estimativa' ? 'Gasto até agora · estimado' : 'Gasto até agora'}
           valor={gasto?.kcal ?? null}
-          fracao={(gasto?.kcal ?? 0) / maior}
+          referencia={plano ? arred50(plano.gastoPrevisto) : null}
+          rotuloReferencia="no dia"
+          fracao={(gasto?.kcal ?? 0) / (plano?.gastoPrevisto ?? maior)}
           cor={cores.verdeVivo}
         />
       </View>
@@ -322,12 +332,29 @@ function CartaoProteina({ resumo }: { resumo: ResumoDoDia }) {
   );
 }
 
-function LinhaBalanco({ titulo, valor, fracao, cor }: { titulo: string; valor: number | null; fracao: number; cor: string }) {
+function LinhaBalanco({
+  titulo,
+  valor,
+  referencia,
+  rotuloReferencia,
+  fracao,
+  cor,
+}: {
+  titulo: string;
+  valor: number | null;
+  referencia: number | null;
+  rotuloReferencia: string;
+  fracao: number;
+  cor: string;
+}) {
   return (
     <View style={{ gap: 6 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF' }}>{titulo}</Text>
-        <Text style={{ fontSize: 13, color: '#FFFFFF', fontVariant: ['tabular-nums'] }}>{valor == null ? '—' : `${milhar(valor)} kcal`}</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF', flexShrink: 1 }}>{titulo}</Text>
+        <Text style={{ fontSize: 13, color: '#FFFFFF', fontVariant: ['tabular-nums'], textAlign: 'right' }}>
+          {valor == null ? '—' : `${milhar(valor)}`}
+          <Text style={{ color: cores.escuroSuave }}>{referencia != null ? ` de ${milhar(referencia)} ${rotuloReferencia}` : ' kcal'}</Text>
+        </Text>
       </View>
       <Barra fracao={fracao} cor={cor} trilho={cores.escuroTrilho} />
     </View>
