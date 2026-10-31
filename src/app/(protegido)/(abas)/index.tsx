@@ -204,39 +204,44 @@ const arred50 = (n: number) => Math.round(n / 50) * 50;
 const textoBalanco = (d: number) => `${kcal(d)} de ${d >= 0 ? 'déficit' : 'superávit'}`;
 
 function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
-  const { gasto, consumoKcal, deficitHoje, plano } = resumo;
+  const { gasto, consumoKcal, deficitHoje, plano, meta } = resumo;
   const maior = Math.max(gasto?.kcal ?? 0, consumoKcal ?? 0, 1);
 
   // Destaque: quanto ainda dá para comer hoje (é a pergunta de quem abre o app).
   let destaque: string;
   let legenda: string;
-  if (!plano) {
+  const restante = meta ? meta.kcal - (consumoKcal ?? 0) : null;
+  const nomeMeta = meta ? `${meta.sugerida ? 'meta sugerida' : 'sua meta'} de ${kcal(meta.kcal)}` : '';
+  if (!meta || restante == null) {
     destaque = '—';
     legenda = 'Complete o perfil e registre o peso para ver quanto ainda dá para comer hoje.';
-  } else if (plano.podeComer > 0) {
-    destaque = `~${milhar(Math.max(50, arred50(plano.podeComer)))} kcal`;
-    legenda = `ainda dá para comer hoje e fechar o dia com cerca de ${kcal(plano.metaDeficit)} de déficit`;
-  } else if (plano.deficitSeParar > 0) {
+  } else if (restante > 0) {
+    destaque = `${milhar(restante)} kcal`;
+    legenda = `ainda dá para comer hoje dentro da ${nomeMeta}`;
+  } else if (restante > -100) {
     destaque = 'Meta do dia feita';
-    legenda = `se não comer mais nada, o dia fecha com ~${kcal(arred50(plano.deficitSeParar))} de déficit (meta: ${kcal(plano.metaDeficit)})`;
+    legenda = `você comeu ${kcal(consumoKcal ?? 0)}, a ${nomeMeta}`;
   } else {
-    destaque = 'Acima do gasto';
-    legenda = `o dia caminha para ~${kcal(arred50(-plano.deficitSeParar))} de superávit`;
+    destaque = `${milhar(-restante)} kcal acima`;
+    legenda = `da ${nomeMeta}. Um dia acima não muda o resultado: o que conta é a média da semana.`;
   }
-  const avisoExcesso = plano && resumo.tarde && plano.podeComer > 0 && plano.deficitExcessivo;
+  const avisoExcesso = plano && resumo.tarde && restante != null && restante > 0 && plano.deficitExcessivo;
 
   return (
     <View style={{ backgroundColor: cores.painel, borderRadius: 22, padding: 20, gap: 16 }}>
       <View style={{ gap: 4 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Calorias de hoje</Text>
-            <BotaoInfo info={EXPLICACOES.metaDoDia} />
-          </View>
-          {plano && (
-            <View style={{ backgroundColor: cores.escuroTrilho, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: cores.escuroSuave }}>meta de hoje ≈ {milhar(arred50(plano.gastoPrevisto - plano.metaDeficit))} kcal</Text>
-            </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Calorias de hoje</Text>
+          <BotaoInfo info={EXPLICACOES.metaDoDia} />
+          <View style={{ flex: 1 }} />
+          {meta && (
+            <Link href="/meta-calorica" asChild>
+              <Pressable accessibilityRole="link" accessibilityLabel="Ajustar meta de calorias" style={{ backgroundColor: cores.escuroTrilho, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: cores.escuroSuave }}>
+                  {meta.sugerida ? 'sugerida' : 'meta'} {milhar(meta.kcal)} ›
+                </Text>
+              </Pressable>
+            </Link>
           )}
         </View>
         <Text style={{ fontSize: 34, fontWeight: '800', color: '#FFFFFF', fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>

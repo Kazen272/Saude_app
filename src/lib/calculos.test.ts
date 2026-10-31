@@ -7,6 +7,7 @@ import {
   fracaoDoDia,
   metaProteina,
   planoDoDia,
+  sugerirMetas,
   gastoTipicoRelogio,
   relacaoCinturaAltura,
   ritmoSemanal,
@@ -219,5 +220,22 @@ describe('gasto: passos + treinos', () => {
     assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105, kcalTreinos: 341 }).kcal, 2991);
     // com o relógio medindo o dia, os treinos não somam de novo
     assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, kcalTotais: 2400, confiarNoTotal: true, kcalTreinos: 341 }).kcal, 2400);
+  });
+});
+
+describe('sugerirMetas', () => {
+  it('homem 105 kg gastando 2.500: gradual 2.200, moderado 2.000, acelerado 1.600 (piso)', () => {
+    const r = sugerirMetas({ gastoBase: 2500, pesoKg: 105, sexo: 'masculino' });
+    assert.deepEqual(r.opcoes.map((o) => o.kcal), [2200, 2000, 1600]);
+    assert.equal(r.opcoes[2].noPiso, true); // 2.500 − 1.000 = 1.500 < 1.600 → piso
+    assert.deepEqual(r.faixa, { min: 2000, max: 2200 });
+  });
+  it('mulher 60 kg: acelerado limitado a 1% do peso por semana (660 kcal) e piso de 1.200', () => {
+    const r = sugerirMetas({ gastoBase: 1900, pesoKg: 60, sexo: 'feminino' });
+    const acelerado = r.opcoes[2];
+    assert.equal(acelerado.limitadoPeloRitmo, true);
+    assert.equal(acelerado.kcal, 1250); // 1.900 − 660 = 1.240 → 1.250
+    assert.ok(acelerado.pctSemana <= 1);
+    assert.equal(sugerirMetas({ gastoBase: 1400, pesoKg: 60, sexo: 'feminino' }).opcoes[1].kcal, 1200);
   });
 });

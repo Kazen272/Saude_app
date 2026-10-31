@@ -274,3 +274,57 @@ export function relacaoCinturaAltura(cinturaCm: number, alturaCm: number): { val
   const valor = Math.round((cinturaCm / alturaCm) * 100) / 100;
   return { valor, nivel: valor < 0.5 ? 'adequado' : valor < 0.6 ? 'atencao' : 'alto' };
 }
+
+// ---------------------------------------------------------------------------
+// Meta de calorias: sugestões com base em referências publicadas.
+//
+// • Déficits: NHLBI (Clinical Guidelines on Overweight and Obesity, 1998):
+//   300–500 kcal/dia → ~0,25–0,5 kg/semana; 500–1.000 kcal/dia → ~0,5–1 kg/semana.
+// • Teto de ritmo: ~1% do peso por semana para preservar massa magra
+//   (Helms, Aragon & Fitschen, JISSN 2014: perdas de ~0,5–1% do peso por semana).
+// • Pisos: NHLBI "Aim for a Healthy Weight" (2009): planos de 1.000–1.200 kcal para
+//   a maioria das mulheres e 1.200–1.600 kcal para a maioria dos homens; usamos o
+//   topo de cada faixa como mínimo da sugestão.
+// • 7.700 kcal ≈ 1 kg: aproximação usada para converter déficit em peso; na prática
+//   a perda desacelera com o tempo, por isso o app recalibra pelo previsto × real.
+
+export const PISO_KCAL: Record<Sexo, number> = { feminino: 1200, masculino: 1600 };
+const DEFICIT_RITMO = { gradual: 300, moderado: 500, acelerado: 1000 } as const;
+export type Ritmo = keyof typeof DEFICIT_RITMO;
+
+export type OpcaoMeta = {
+  ritmo: Ritmo;
+  kcal: number;
+  deficit: number;
+  kgSemana: number;
+  pctSemana: number;
+  /** O déficit foi reduzido para não passar de 1% do peso por semana. */
+  limitadoPeloRitmo: boolean;
+  /** A meta ficou no piso de segurança. */
+  noPiso: boolean;
+};
+
+export function sugerirMetas(p: { gastoBase: number; pesoKg: number; sexo: Sexo }): { opcoes: OpcaoMeta[]; piso: number; faixa: { min: number; max: number } } {
+  const piso = PISO_KCAL[p.sexo];
+  const tetoDeficit = (p.pesoKg * 0.01 * KCAL_POR_KG) / 7; // 1% do peso por semana
+  const r50 = (n: number) => Math.round(n / 50) * 50;
+  const opcoes = (Object.keys(DEFICIT_RITMO) as Ritmo[]).map((ritmo) => {
+    const desejado = Math.min(DEFICIT_RITMO[ritmo], tetoDeficit);
+    const bruto = r50(p.gastoBase - desejado);
+    const kcal = Math.max(piso, bruto);
+    const deficit = Math.max(0, Math.round(p.gastoBase - kcal));
+    const kgSemana = Math.round(((deficit * 7) / KCAL_POR_KG) * 100) / 100;
+    return {
+      ritmo,
+      kcal,
+      deficit,
+      kgSemana,
+      pctSemana: Math.round((kgSemana / p.pesoKg) * 1000) / 10,
+      limitadoPeloRitmo: DEFICIT_RITMO[ritmo] > tetoDeficit,
+      noPiso: bruto < piso,
+    };
+  });
+  const moderado = opcoes.find((o) => o.ritmo === 'moderado') as OpcaoMeta;
+  const gradual = opcoes.find((o) => o.ritmo === 'gradual') as OpcaoMeta;
+  return { opcoes, piso, faixa: { min: moderado.kcal, max: gradual.kcal } };
+}

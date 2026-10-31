@@ -115,10 +115,12 @@ export const EXPLICACOES = {
     ],
   },
   metaDoDia: {
-    titulo: 'Quanto ainda dá para comer',
+    titulo: 'Meta do dia',
     paragrafos: [
-      'Gasto previsto até a meia-noite (metabolismo do dia inteiro + atividade já medida, sem contar treino que ainda não aconteceu) − meta de déficit − o que você já comeu.',
-      'Meta de déficit: 500 kcal, ou 20% do gasto se for menor. A meta de hoje é o total que dá para comer no dia e ainda fechar nessa meta.',
+      'Quanto ainda dá para comer = sua meta de calorias − o que você já comeu hoje.',
+      'A meta é a que você escolheu em Mais › Meta de calorias. Sem escolha, o app usa a sugestão moderada: seu gasto médio menos 500 kcal (NHLBI), nunca acima de 1% do peso por semana (Helms et al., 2014) e nunca abaixo de 1.600 kcal para homens ou 1.200 para mulheres (NHLBI).',
+      'Seu gasto médio vem do relógio e dos passos dos últimos 14 dias; sem dados suficientes, da fórmula de Mifflin-St Jeor × seu nível de atividade.',
+      'A linha "Até agora" mostra o saldo real do dia, com o gasto medido até o momento.',
     ],
   },
 } satisfies Record<string, TextoInfo>;

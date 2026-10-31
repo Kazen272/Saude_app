@@ -5,6 +5,7 @@ import {
   gastoDiario,
   metaProteina,
   planoDoDia,
+  sugerirMetas,
   gastoTipicoRelogio,
   relacaoCinturaAltura,
   ritmoSemanal,
@@ -17,6 +18,7 @@ import {
   type Sexo,
   type NivelCintura,
   type PlanoDoDia,
+  type OpcaoMeta,
 } from './calculos';
 import { diaLocal, inicioDaSemana, limitesDoDia, porSemana, somarDias } from './datas';
 import { alertaDeficitAgressivo, mediaCampo, resumirSono } from './bemestar';
@@ -58,6 +60,8 @@ export type Perfil = {
   height_cm: number | null;
   activity_factor: number;
   goal_weight_kg: number | null;
+  /** Meta de kcal por dia escolhida (null = usar a sugestão moderada). */
+  calorie_goal: number | null;
   water_goal_ml: number;
 };
 
@@ -89,6 +93,8 @@ export type ResumoDoDia = {
   plano: PlanoDoDia | null;
   /** Já são 15h ou mais: hora de avisar se o dia vai fechar com déficit grande demais. */
   tarde: boolean;
+  /** Meta de kcal do dia: a escolhida no perfil ou a sugestão moderada. */
+  meta: { kcal: number; sugerida: boolean } | null;
 };
 
 // Postgres devolve numeric como string; converte para número.
@@ -101,8 +107,9 @@ function normalizarPerfil(p: Record<string, unknown>): Perfil {
     sex: (p.sex as Sexo | null) ?? null,
     birth_date: (p.birth_date as string | null) ?? null,
     height_cm: num(p.height_cm),
-    activity_factor: num(p.activity_factor) ?? 1.2,
+    activity_factor: num(p.activity_factor) ?? 1.4,
     goal_weight_kg: num(p.goal_weight_kg),
+    calorie_goal: num(p.calorie_goal),
     water_goal_ml: num(p.water_goal_ml) ?? 3000,
   };
 }
@@ -374,6 +381,46 @@ async function carregarHistorico28(hoje: string) {
   return { atividades: (atividades.data ?? []) as Atividade[], nutricoes: nutricoesNum as Nutricao[], treinos: treinosGasto };
 }
 
+export type SugestaoMeta = {
+  gastoBase: number;
+  /** medido: média do gasto dos dias com relógio/passos; formula: metabolismo × nível de atividade. */
+  origem: 'medido' | 'formula';
+  diasMedidos: number;
+  tmb: number;
+  pal: number;
+  pesoKg: number;
+  opcoes: OpcaoMeta[];
+  piso: number;
+  faixa: { min: number; max: number };
+};
+
+/** Base para a sugestão de meta: gasto médio medido (14 dias completos, 7+ com dados) ou fórmula. */
+function sugestaoDeMeta(perfil: Perfil, analise: ReturnType<typeof analisar>, hoje: string): SugestaoMeta | null {
+  const tmb = tmbDoPerfil(perfil, analise.pesoRef, hoje);
+  if (tmb == null || analise.pesoRef == null || !perfil.sex) return null;
+  const medidos = Array.from({ length: 14 }, (_, i) => analise.balancoDe(somarDias(hoje, -14 + i)))
+    .filter((b) => b.gasto != null && !b.gastoEstimado)
+    .map((b) => b.gasto as number);
+  const medido = medidos.length >= 7;
+  const gastoBase = Math.round(medido ? medidos.reduce((s, g) => s + g, 0) / medidos.length : tmb * perfil.activity_factor);
+  return {
+    gastoBase,
+    origem: medido ? 'medido' : 'formula',
+    diasMedidos: medidos.length,
+    tmb: Math.round(tmb),
+    pal: perfil.activity_factor,
+    pesoKg: analise.pesoRef,
+    ...sugerirMetas({ gastoBase, pesoKg: analise.pesoRef, sexo: perfil.sex }),
+  };
+}
+
+/** Sugestões de meta calórica para a tela do perfil. */
+export async function carregarSugestaoMeta(): Promise<SugestaoMeta | null> {
+  const hoje = diaLocal();
+  const [perfil, pesagens, historico] = await Promise.all([carregarPerfil(), carregarPesagens(35), carregarHistorico28(hoje)]);
+  return sugestaoDeMeta(perfil, analisar({ perfil, pesagens, ...historico, hoje }), hoje);
+}
+
 export type Progresso = {
   perfil: Perfil;
   perfilCompleto: boolean;
@@ -514,8 +561,17 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
           kcalTreinos: kcalTreinosPorDia(historico.treinos, analise.pesoRef).get(hoje) ?? null,
         });
 
+  const sugestao = sugestaoDeMeta(perfil, analise, hoje);
+  const meta =
+    perfil.calorie_goal != null
+      ? { kcal: perfil.calorie_goal, sugerida: false }
+      : sugestao
+        ? { kcal: (sugestao.opcoes.find((o) => o.ritmo === 'moderado') as OpcaoMeta).kcal, sugerida: true }
+        : null;
+
   return {
     plano,
+    meta,
     tarde: agora.getHours() >= 15,
     horaParcial: `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`,
     ontem: { gasto: balancoOntem.gasto, consumo: balancoOntem.consumo, deficit: balancoOntem.deficit },

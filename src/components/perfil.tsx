@@ -7,11 +7,12 @@ import { carregarPerfil, carregarPesagens, salvarPerfil, type Perfil } from '@/l
 import { decimal } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
+/** Nível de atividade física (PAL), pelas faixas da FAO/OMS/UNU (2004). */
 export const NIVEIS = [
-  { fator: 1.2, nome: 'Sedentário', detalhe: 'pouco movimento no dia' },
-  { fator: 1.375, nome: 'Leve', detalhe: 'treina 1 a 3 vezes por semana' },
-  { fator: 1.55, nome: 'Moderado', detalhe: 'treina 3 a 5 vezes por semana' },
-  { fator: 1.725, nome: 'Intenso', detalhe: 'treina quase todo dia' },
+  { fator: 1.4, nome: 'Sedentário', detalhe: 'trabalho sentado e pouco exercício (PAL 1,40)' },
+  { fator: 1.55, nome: 'Leve', detalhe: 'trabalho sentado e exercício algumas vezes por semana (PAL 1,55)' },
+  { fator: 1.7, nome: 'Moderado', detalhe: 'trabalho sentado e treino na maioria dos dias (PAL 1,70)' },
+  { fator: 2.0, nome: 'Intenso', detalhe: 'trabalho físico pesado ou treino intenso todo dia (PAL 2,00)' },
 ];
 
 /** "28/10/1992" → "1992-10-28"; inválido → null. */
@@ -40,7 +41,7 @@ export function FormularioPerfil({ tituloBotao = 'Salvar perfil', aoSalvar, semC
   const [meta, setMeta] = useState('');
   const [agua, setAgua] = useState('');
   const [sugestaoAgua, setSugestaoAgua] = useState<number | null>(null);
-  const [fator, setFator] = useState(1.2);
+  const [fator, setFator] = useState(1.4);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'erro' | 'ok'; texto: string } | null>(null);
 
