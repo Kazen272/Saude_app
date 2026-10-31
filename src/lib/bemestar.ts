@@ -63,7 +63,8 @@ export function resumirSono(noites: Noite[]): ResumoSono {
   };
 }
 
-export type CheckIn = { dia: string; energia: number | null; fome: number | null; humor: number | null };
+export type CheckIn = { dia: string; energia: number | null; fome: number | null; humor: number | null; dor?: number | null };
+export type CampoCheckin = 'energia' | 'fome' | 'humor' | 'dor';
 
 /**
  * Sinal de déficit agressivo demais: nos últimos 3 check-ins, energia média
@@ -79,7 +80,7 @@ export function alertaDeficitAgressivo(checkins: CheckIn[]): boolean {
   return media(respondidos.map((c) => c.energia as number)) <= 2 && media(respondidos.map((c) => c.fome as number)) >= 4;
 }
 
-export function mediaCampo(checkins: CheckIn[], campo: 'energia' | 'fome' | 'humor'): number | null {
+export function mediaCampo(checkins: CheckIn[], campo: CampoCheckin): number | null {
   const valores = checkins.map((c) => c[campo]).filter((v): v is number => v != null);
   return valores.length ? Math.round((valores.reduce((s, v) => s + v, 0) / valores.length) * 10) / 10 : null;
 }

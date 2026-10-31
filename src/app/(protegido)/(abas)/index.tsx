@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CartaoCheckin, CartaoSono } from '@/components/bemestar';
 import { BotaoInfo, Botao, Cabecalho, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
-import { alertaDeficitAgressivo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
+import { alertaDeficitAgressivo, resumirSono, type CheckIn, type Noite, type CampoCheckin } from '@/lib/bemestar';
 import { carregarCheckins, carregarNoites, salvarCheckin } from '@/lib/bemestar-dados';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -94,13 +94,17 @@ export default function Hoje() {
     }
   }
 
-  async function mudarCheckin(campo: 'energia' | 'fome' | 'humor', valor: number) {
+  async function mudarCheckin(campo: CampoCheckin, valor: number) {
     const hoje = diaLocal();
     const anterior = checkins;
     const atual = checkins.find((c) => c.dia === hoje) ?? { dia: hoje, energia: null, fome: null, humor: null };
     setCheckins([...checkins.filter((c) => c.dia !== hoje), { ...atual, [campo]: valor }]);
     try {
       await salvarCheckin(hoje, { [campo]: valor });
+      // A recuperação usa o check-in: recalcula na hora.
+      carregarProntidao()
+        .then(setProntidao)
+        .catch(() => {});
     } catch {
       setCheckins(anterior);
       setErro('Não foi possível salvar o check-in.');

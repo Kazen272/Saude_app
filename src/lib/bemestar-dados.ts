@@ -66,7 +66,7 @@ export async function carregarCheckins(dias: number, ate: string = diaLocal()): 
   const desde = somarDias(ate, -(dias - 1));
   const { data, error } = await supabase
     .from('daily_checkins')
-    .select('day, energy, hunger, mood')
+    .select('day, energy, hunger, mood, soreness')
     .gte('day', desde)
     .lte('day', ate)
     .order('day');
@@ -76,16 +76,18 @@ export async function carregarCheckins(dias: number, ate: string = diaLocal()): 
     energia: (c.energy as number | null) ?? null,
     fome: (c.hunger as number | null) ?? null,
     humor: (c.mood as number | null) ?? null,
+    dor: (c.soreness as number | null) ?? null,
   }));
 }
 
 /** Grava só os campos informados do check-in do dia (os outros ficam como estão). */
-export async function salvarCheckin(dia: string, campos: Partial<Pick<CheckIn, 'energia' | 'fome' | 'humor'>>): Promise<void> {
+export async function salvarCheckin(dia: string, campos: Partial<Pick<CheckIn, 'energia' | 'fome' | 'humor' | 'dor'>>): Promise<void> {
   const { data: usuario } = await supabase.auth.getUser();
   const linha: Record<string, unknown> = { user_id: usuario.user?.id, day: dia, updated_at: new Date().toISOString() };
   if ('energia' in campos) linha.energy = campos.energia;
   if ('fome' in campos) linha.hunger = campos.fome;
   if ('humor' in campos) linha.mood = campos.humor;
+  if ('dor' in campos) linha.soreness = campos.dor;
   const { error } = await supabase.from('daily_checkins').upsert(linha, { onConflict: 'user_id,day' });
   if (error) throw error;
 }

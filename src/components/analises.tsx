@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
 import { GraficoSemanas } from '@/components/graficos';
 import { CabecalhoCartao, Cartao, Nota } from '@/components/ui';
@@ -212,23 +213,46 @@ const NIVEIS = {
 };
 
 export function CartaoProntidao({ p }: { p: Prontidao | null }) {
+  const [aberto, setAberto] = useState(false);
   if (!p) return null;
   const n = NIVEIS[p.nivel];
   return (
-    <Cartao estilo={{ gap: 6 }}>
+    <Cartao estilo={{ gap: 8 }}>
       <CabecalhoCartao
         titulo="Recuperação de hoje"
         info={EXPLICACOES.prontidao}
         direita={
           <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: n.fundo() }}>
             <Text style={{ fontSize: 12, fontWeight: '800', color: n.cor() }}>
-              {n.nome} · {p.pontos}
+              {n.nome}
+              {p.completa ? ` · ${p.pontos}` : ' · parcial'}
             </Text>
           </View>
         }
       />
       <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>{p.sugestao}</Text>
-      <Nota>{p.motivos.join(' · ')}</Nota>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: aberto }} onPress={() => setAberto((v) => !v)} style={{ minHeight: 32, justifyContent: 'center' }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: cores.verdeTexto }}>{aberto ? 'esconder o que pesou' : 'ver o que pesou'}</Text>
+      </Pressable>
+      {aberto && (
+        <View>
+          {p.fatores.map((f, i) => (
+            <View
+              key={f.id}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: cores.linhaSuave }}
+            >
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: f.status === 'atencao' ? cores.laranja : f.status === 'ok' ? cores.verde : cores.linha }} />
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: cores.tinta }}>{f.nome}</Text>
+                <Text style={{ fontSize: 12, color: cores.cinza }}>{f.texto}</Text>
+              </View>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: f.desconto ? cores.laranja : cores.cinza, fontVariant: ['tabular-nums'] }}>
+                {f.status === 'sem_dado' ? '—' : f.desconto ? `−${f.desconto}` : '0'}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </Cartao>
   );
 }

@@ -4,15 +4,18 @@ import { Pressable, Text, View, StyleSheet } from 'react-native';
 import Svg, { G, Line, Rect, Text as SvgTexto } from 'react-native-svg';
 
 import { Cartao, Nota, Rotulo, estilos, useLarguraDoCartao } from '@/components/ui';
-import { formatarDuracao, formatarHora, type CheckIn, type Noite, type ResumoSono } from '@/lib/bemestar';
+import { formatarDuracao, formatarHora, type CheckIn, type Noite, type ResumoSono, type CampoCheckin } from '@/lib/bemestar';
 import { diaLocal, somarDias } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
-const ROTULOS: Record<'energia' | 'fome' | 'humor', [string, string]> = {
+const ROTULOS: Record<CampoCheckin, [string, string]> = {
   energia: ['sem energia', 'muita energia'],
   fome: ['sem fome', 'muita fome'],
   humor: ['péssimo', 'ótimo'],
+  dor: ['nenhuma', 'muita'],
 };
+
+const TITULOS: Record<CampoCheckin, string> = { energia: 'Energia', fome: 'Fome', humor: 'Humor', dor: 'Dor muscular / cansaço físico' };
 
 /** Uma linha de 1 a 5 botões. */
 export function Escala({
@@ -20,11 +23,11 @@ export function Escala({
   valor,
   aoEscolher,
 }: {
-  campo: 'energia' | 'fome' | 'humor';
+  campo: CampoCheckin;
   valor: number | null;
   aoEscolher: (v: number) => void;
 }) {
-  const titulo = campo.charAt(0).toUpperCase() + campo.slice(1);
+  const titulo = TITULOS[campo];
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 8 }}>
@@ -68,9 +71,9 @@ export function CartaoCheckin({
 }: {
   checkin: CheckIn | null;
   alerta: boolean;
-  aoMudar: (campo: 'energia' | 'fome' | 'humor', v: number) => void;
+  aoMudar: (campo: CampoCheckin, v: number) => void;
 }) {
-  const respondido = checkin != null && checkin.energia != null && checkin.fome != null && checkin.humor != null;
+  const respondido = checkin != null && checkin.energia != null && checkin.fome != null && checkin.humor != null && checkin.dor != null;
   const [editando, setEditando] = useState(false);
   // Depois de responder, o cartão encolhe para uma linha; "editar" abre de novo.
   const compacto = respondido && !editando;
@@ -92,6 +95,7 @@ export function CartaoCheckin({
             <Text style={{ fontSize: 12, fontWeight: '700', color: cores.cinza }}>Check-in de hoje</Text>
             <Text style={{ fontSize: 15, fontWeight: '700', color: cores.tinta }}>
               Energia {checkin!.energia} · Fome {checkin!.fome} · Humor {checkin!.humor}
+              {checkin!.dor != null ? ` · Dor ${checkin!.dor}` : ''}
             </Text>
           </View>
           <Pressable
@@ -123,6 +127,7 @@ export function CartaoCheckin({
       <Escala campo="energia" valor={checkin?.energia ?? null} aoEscolher={(v) => aoMudar('energia', v)} />
       <Escala campo="fome" valor={checkin?.fome ?? null} aoEscolher={(v) => aoMudar('fome', v)} />
       <Escala campo="humor" valor={checkin?.humor ?? null} aoEscolher={(v) => aoMudar('humor', v)} />
+      <Escala campo="dor" valor={checkin?.dor ?? null} aoEscolher={(v) => aoMudar('dor', v)} />
       {aviso}
     </Cartao>
   );
@@ -226,7 +231,7 @@ export function GraficoSono({ noites, ate = diaLocal() }: { noites: Noite[]; ate
 /** Grade de 7 dias × energia, fome, humor: cada célula mostra a nota. */
 export function GradeCheckins({ checkins, ate = diaLocal() }: { checkins: CheckIn[]; ate?: string }) {
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(ate, i - 6));
-  const linhas: { campo: 'energia' | 'fome' | 'humor'; nome: string; bomAlto: boolean }[] = [
+  const linhas: { campo: CampoCheckin; nome: string; bomAlto: boolean }[] = [
     { campo: 'energia', nome: 'Energia', bomAlto: true },
     { campo: 'fome', nome: 'Fome', bomAlto: false },
     { campo: 'humor', nome: 'Humor', bomAlto: true },

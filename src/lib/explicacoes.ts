@@ -110,8 +110,14 @@ export const EXPLICACOES = {
   prontidao: {
     titulo: 'Recuperação de hoje',
     paragrafos: [
-      'Começa em 100 e desconta: FC de repouso de hoje acima da sua média dos últimos 14 dias (−8 por bpm além de 2), sono da última noite (menos de 6h: −25; menos de 7h: −10) e energia do check-in (1 ou 2: −20; 3: −5).',
-      'Boa: 75 ou mais · Média: 50 a 74 · Baixa: abaixo de 50. Usa os dados que houver; sem nenhum dos três, o cartão não aparece.',
+      'Junta vários sinais, porque nenhum sozinho basta. Começa em 100 e cada sinal desconta pontos; toque em "ver o que pesou" para ver cada um.',
+      'Como você se sente (pesa mais): energia 1 → −25, 2 → −15, 3 → −5; dor muscular/cansaço 5 → −25, 4 → −15, 3 → −5; humor 1–2 → −10. Em atletas, o que a pessoa relata acompanha a carga de treino melhor que medidas objetivas (Saw, Main & Gastin, BJSM 2016).',
+      'Sono: menos de 6h → −20; menos de 7h → −10; média das 3 últimas noites abaixo de 6h30 → −5.',
+      'Treinos: carga = minutos × intensidade (método session-RPE de Foster, 2001; leve ≈ 3, moderada ≈ 5, intensa ≈ 7; Hevy e relógio contam como moderada). Treino puxado ontem (carga ≥ 400, ex.: 1h intensa) → −10; 3 dias seguidos ou mais → −10; últimos 7 dias 50% acima da sua média semanal → −10.',
+      'Alimentação: déficit médio dos últimos 3 dias acima de 750 kcal → −10; acima de 1.000 → −15.',
+      'FC de repouso: −8 por bpm acima de 2 da sua média de 14 dias, quando o relógio envia.',
+      'Boa: 75 ou mais · Média: 50 a 74 · Baixa: abaixo de 50. Sem o check-in de hoje (energia e dor), a avaliação fica "parcial" e nunca passa de média.',
+      'É uma orientação geral, não substitui avaliação profissional; dor forte ou persistente pede um médico ou fisioterapeuta.',
     ],
   },
   metaDoDia: {

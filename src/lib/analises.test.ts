@@ -53,12 +53,26 @@ describe('constância', () => {
 });
 
 describe('prontidão', () => {
-  it('desconta FC alta, sono curto e energia baixa', () => {
-    const p = prontidao({ fcHoje: 68, fcMedia: 60, sonoMin: 330, energia: 2 });
-    assert.equal(p?.pontos, 7); // 100 − 48 − 25 − 20
-    assert.equal(p?.nivel, 'baixa');
-    assert.equal(prontidao({ fcHoje: null, fcMedia: null, sonoMin: 460, energia: 4 })?.nivel, 'boa');
-    assert.equal(prontidao({ fcHoje: null, fcMedia: 60, sonoMin: null, energia: null }), null);
+  const base = { hoje: '2026-10-31', humor: 4, sonoMin: 460, sono3Min: 450, cargas: [], deficits3: [400, 500, 450], fcHoje: null, fcMedia: null };
+  it('cansaço e dor no check-in derrubam a nota, mesmo dormindo bem', () => {
+    const p = prontidao({ ...base, energia: 2, dor: 4 });
+    assert.equal(p?.pontos, 70); // 100 − 15 − 15
+    assert.equal(p?.nivel, 'media');
+  });
+  it('sem check-in nunca diz que está tudo bem', () => {
+    const p = prontidao({ ...base, energia: null, dor: null, humor: null });
+    assert.equal(p?.completa, false);
+    assert.equal(p?.nivel, 'media');
+    assert.match(p?.sugestao ?? '', /check-in/);
+  });
+  it('treino puxado ontem, dias seguidos e déficit grande', () => {
+    const cargas = ['2026-10-28', '2026-10-29', '2026-10-30'].map((dia) => ({ dia, carga: dia === '2026-10-30' ? 480 : 300 }));
+    const p = prontidao({ ...base, energia: 4, dor: 2, cargas, deficits3: [1100, 1200, 1000] });
+    assert.equal(p?.pontos, 65); // −10 ontem −10 seguidos −15 déficit
+    assert.ok(p?.fatores.find((f) => f.id === 'carga')?.texto.includes('3 dias seguidos'));
+  });
+  it('tudo bem: boa', () => {
+    assert.equal(prontidao({ ...base, energia: 4, dor: 1 })?.nivel, 'boa');
   });
 });
 

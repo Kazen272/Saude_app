@@ -153,59 +153,137 @@ export function sequencias(dias: DiaConsolidado[], metaAguaMl: number): Sequenci
 
 // ---------------------------------------------------------------------------
 // 2. Prontidão (recuperação)
+//
+// Combina vários sinais, porque nenhum sozinho basta:
+// • Como você se sente (energia, dor muscular, humor): em atletas, medidas
+//   autorrelatadas acompanham a carga de treino melhor que as objetivas
+//   (Saw, Main & Gastin, BJSM 2016). Por isso pesam mais.
+// • Sono da última noite e das últimas 3.
+// • Carga de treino: duração × intensidade (método session-RPE de Foster, 2001;
+//   leve ≈ 3, moderada ≈ 5, intensa ≈ 7 na escala de 0 a 10). Treino puxado ontem,
+//   dias seguidos de treino e semana muito acima do habitual descontam.
+// • Déficit calórico grande nos últimos dias.
+// • FC de repouso acima da sua média, quando o relógio envia.
+
+export type FatorProntidao = { id: string; nome: string; texto: string; desconto: number; status: 'ok' | 'atencao' | 'sem_dado' };
 
 export type Prontidao = {
   nivel: 'boa' | 'media' | 'baixa';
   pontos: number;
-  motivos: string[];
+  fatores: FatorProntidao[];
+  /** Tem o check-in de hoje (energia e dor)? Sem ele, a avaliação é parcial. */
+  completa: boolean;
   sugestao: string;
 };
 
-/**
- * Começa em 100 e desconta: FC de repouso acima da sua média (−8 por bpm além de 2),
- * sono curto (< 6h −25, < 7h −10) e energia baixa no check-in (1–2 −20, 3 −5).
- * Precisa de pelo menos um dos três dados.
- */
-export function prontidao(p: { fcHoje: number | null; fcMedia: number | null; sonoMin: number | null; energia: number | null }): Prontidao | null {
-  if (p.sonoMin == null && p.energia == null && (p.fcHoje == null || p.fcMedia == null)) return null;
-  let pontos = 100;
-  const motivos: string[] = [];
-  if (p.fcHoje != null && p.fcMedia != null) {
+export type CargaDia = { dia: string; carga: number };
+
+export function prontidao(p: {
+  hoje: string;
+  energia: number | null;
+  dor: number | null;
+  humor: number | null;
+  sonoMin: number | null;
+  sono3Min: number | null;
+  /** Carga por dia nos últimos 35 dias (pode incluir hoje). */
+  cargas: CargaDia[];
+  /** Déficit dos últimos 3 dias completos com dieta. */
+  deficits3: number[];
+  fcHoje: number | null;
+  fcMedia: number | null;
+}): Prontidao | null {
+  const fatores: FatorProntidao[] = [];
+  const add = (id: string, nome: string, texto: string, desconto: number, semDado = false) =>
+    fatores.push({ id, nome, texto, desconto, status: semDado ? 'sem_dado' : desconto > 0 ? 'atencao' : 'ok' });
+
+  // Como você se sente
+  if (p.energia == null && p.dor == null && p.humor == null) add('sentir', 'Como você se sente', 'sem check-in hoje', 0, true);
+  else {
+    const dEn = p.energia == null ? 0 : p.energia === 1 ? 25 : p.energia === 2 ? 15 : p.energia === 3 ? 5 : 0;
+    const dDor = p.dor == null ? 0 : p.dor === 5 ? 25 : p.dor === 4 ? 15 : p.dor === 3 ? 5 : 0;
+    const dHu = p.humor != null && p.humor <= 2 ? 10 : 0;
+    const partes = [
+      p.energia != null ? `energia ${p.energia}/5` : 'energia sem resposta',
+      p.dor != null ? `dor ${p.dor}/5` : 'dor sem resposta',
+      p.humor != null ? `humor ${p.humor}/5` : null,
+    ].filter(Boolean);
+    add('sentir', 'Como você se sente', partes.join(' · '), dEn + dDor + dHu);
+  }
+
+  // Sono
+  if (p.sonoMin == null) add('sono', 'Sono', 'sem registro da última noite', 0, true);
+  else {
+    const h = (m: number) => `${Math.floor(m / 60)}h${String(Math.round(m % 60)).padStart(2, '0')}`;
+    let d = p.sonoMin < 360 ? 20 : p.sonoMin < 420 ? 10 : 0;
+    if (p.sono3Min != null && p.sono3Min < 390) d += 5;
+    add('sono', 'Sono', `${h(p.sonoMin)} na última noite${p.sono3Min != null ? ` · média de 3 noites ${h(p.sono3Min)}` : ''}`, d);
+  }
+
+  // Carga de treino
+  const ontem = new Date(Date.parse(p.hoje) - 86_400_000).toISOString().slice(0, 10);
+  const cargaDe = (dia: string) => p.cargas.filter((c) => c.dia === dia).reduce((s, c) => s + c.carga, 0);
+  let seguidos = 0;
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(Date.parse(p.hoje) - i * 86_400_000).toISOString().slice(0, 10);
+    if (cargaDe(d) > 0) seguidos += 1;
+    else break;
+  }
+  const inicio7 = new Date(Date.parse(p.hoje) - 6 * 86_400_000).toISOString().slice(0, 10);
+  const inicio35 = new Date(Date.parse(p.hoje) - 34 * 86_400_000).toISOString().slice(0, 10);
+  const aguda = p.cargas.filter((c) => c.dia >= inicio7 && c.dia <= p.hoje).reduce((s, c) => s + c.carga, 0);
+  const anteriores = p.cargas.filter((c) => c.dia >= inicio35 && c.dia < inicio7);
+  const semanasComDado = new Set(anteriores.map((c) => Math.floor((Date.parse(c.dia) - Date.parse(inicio35)) / (7 * 86_400_000)))).size;
+  const cronicaSemanal = semanasComDado >= 2 ? anteriores.reduce((s, c) => s + c.carga, 0) / 4 : null;
+  if (p.cargas.length === 0) add('carga', 'Treinos', 'nenhum treino nos últimos 35 dias', 0, true);
+  else {
+    const textos: string[] = [];
+    let d = 0;
+    const cOntem = cargaDe(ontem);
+    if (cOntem >= 400) {
+      d += 10;
+      textos.push('treino puxado ontem');
+    } else if (cOntem > 0) textos.push('treinou ontem');
+    if (seguidos >= 3) {
+      d += 10;
+      textos.push(`${seguidos} dias seguidos de treino`);
+    }
+    if (cronicaSemanal != null && cronicaSemanal > 0 && aguda > cronicaSemanal * 1.5) {
+      d += 10;
+      textos.push('semana bem acima do seu habitual');
+    }
+    add('carga', 'Treinos', textos.length ? textos.join(' · ') : 'carga dentro do habitual', d);
+  }
+
+  // Déficit
+  if (p.deficits3.length < 2) add('deficit', 'Alimentação', 'poucos dias com dieta registrada', 0, true);
+  else {
+    const m = p.deficits3.reduce((s, x) => s + x, 0) / p.deficits3.length;
+    const d = m > 1000 ? 15 : m > 750 ? 10 : 0;
+    add('deficit', 'Alimentação', d ? `déficit médio de ${Math.round(m)} kcal nos últimos dias` : 'déficit moderado', d);
+  }
+
+  // FC de repouso
+  if (p.fcHoje == null || p.fcMedia == null) add('fc', 'FC de repouso', 'sem dados do relógio', 0, true);
+  else {
     const acima = p.fcHoje - p.fcMedia;
-    if (acima > 2) {
-      pontos -= Math.round((acima - 2) * 8);
-      motivos.push(`FC de repouso ${Math.round(acima)} bpm acima da sua média`);
-    } else motivos.push('FC de repouso normal');
+    add('fc', 'FC de repouso', acima > 2 ? `${Math.round(acima)} bpm acima da sua média` : 'dentro da sua média', acima > 2 ? Math.round((acima - 2) * 8) : 0);
   }
-  if (p.sonoMin != null) {
-    const h = `${Math.floor(p.sonoMin / 60)}h${String(p.sonoMin % 60).padStart(2, '0')}`;
-    if (p.sonoMin < 6 * 60) {
-      pontos -= 25;
-      motivos.push(`dormiu ${h}`);
-    } else if (p.sonoMin < 7 * 60) {
-      pontos -= 10;
-      motivos.push(`dormiu ${h}`);
-    } else motivos.push(`dormiu bem (${h})`);
-  }
-  if (p.energia != null) {
-    if (p.energia <= 2) {
-      pontos -= 20;
-      motivos.push('energia baixa no check-in');
-    } else if (p.energia === 3) pontos -= 5;
-  }
-  pontos = Math.max(0, Math.min(100, pontos));
-  const nivel = pontos >= 75 ? 'boa' : pontos >= 50 ? 'media' : 'baixa';
-  return {
-    nivel,
-    pontos,
-    motivos,
-    sugestao:
-      nivel === 'boa'
-        ? 'Bom dia para treinar forte.'
-        : nivel === 'media'
-          ? 'Dá para treinar, mas sem buscar recorde.'
-          : 'Considere um treino leve, alongamento ou descanso hoje.',
-  };
+
+  const comDado = fatores.filter((f) => f.status !== 'sem_dado');
+  if (comDado.length === 0) return null;
+  const pontos = Math.max(0, Math.min(100, 100 - fatores.reduce((s, f) => s + f.desconto, 0)));
+  const completa = p.energia != null && p.dor != null;
+  let nivel: Prontidao['nivel'] = pontos >= 75 ? 'boa' : pontos >= 50 ? 'media' : 'baixa';
+  // Sem saber como você se sente, nunca afirma que está tudo bem.
+  if (!completa && nivel === 'boa') nivel = 'media';
+  const sugestao = !completa
+    ? 'Responda energia e dor no check-in de hoje para uma avaliação completa.'
+    : nivel === 'boa'
+      ? 'Corpo recuperado: bom dia para treinar forte.'
+      : nivel === 'media'
+        ? 'Dá para treinar, mas sem buscar recorde; priorize técnica e volume menor.'
+        : 'Considere descanso, alongamento ou um treino bem leve hoje.';
+  return { nivel, pontos, fatores, completa, sugestao };
 }
 
 // ---------------------------------------------------------------------------

@@ -155,7 +155,7 @@ export type RegistrosDoDia = {
   corpo: { pesoKg: number | null; medidas: Valores; origem: string } | null;
   agua: { id: number; ml: number; hora: string }[];
   sono: { origem: string; deitou: string; acordou: string; qualidade: number | null }[];
-  checkin: { energia: number | null; fome: number | null; humor: number | null } | null;
+  checkin: { energia: number | null; fome: number | null; humor: number | null; dor: number | null } | null;
   /** Dieta do dia como chegou do Health Connect (FatSecret), com a hora da última leitura. */
   dieta: { kcal: number; proteina: number | null; carbo: number | null; gordura: number | null; lidaEm: string; corrigida: boolean } | null;
 };
@@ -173,7 +173,7 @@ export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDi
     supabase.from('body_entries').select(`weight_kg, source, ${COLUNAS.join(', ')}`).eq('measured_on', dia).maybeSingle(),
     supabase.from('water_entries').select('id, amount_ml, logged_at').gte('logged_at', inicio).lt('logged_at', fim).order('logged_at'),
     supabase.from('sleep_sessions').select('bed_at, wake_at, quality, source').eq('night', dia),
-    supabase.from('daily_checkins').select('energy, hunger, mood').eq('day', dia).maybeSingle(),
+    supabase.from('daily_checkins').select('energy, hunger, mood, soreness').eq('day', dia).maybeSingle(),
     supabase.from('nutrition_days').select('kcal, protein_g, carbs_g, fat_g, synced_at, source').eq('day', dia).maybeSingle(),
   ]);
   for (const r of [corpo, agua, sono, checkin, dieta]) if (r.error) throw r.error;
@@ -204,7 +204,7 @@ export async function carregarRegistrosDoDia(dia: string): Promise<RegistrosDoDi
             corrigida: dieta.data.source === 'manual',
           }
         : null,
-    checkin: checkin.data ? { energia: checkin.data.energy as number | null, fome: checkin.data.hunger as number | null, humor: checkin.data.mood as number | null } : null,
+    checkin: checkin.data ? { energia: checkin.data.energy as number | null, fome: checkin.data.hunger as number | null, humor: checkin.data.mood as number | null, dor: (checkin.data.soreness as number | null) ?? null } : null,
   };
 }
 
@@ -929,23 +929,52 @@ export async function carregarAnalises(): Promise<Analises> {
   };
 }
 
-/** Recuperação de hoje (tela Hoje): FC de repouso × média de 14 dias, sono da noite e energia. */
+/** Recuperação de hoje (tela Hoje): check-in, sono, carga de treino, déficit e FC de repouso. */
 export async function carregarProntidao(): Promise<Prontidao | null> {
   const hoje = diaLocal();
-  const desde = somarDias(hoje, -14);
-  const [fc, noites, checkins] = await Promise.all([
-    supabase.from('daily_activity').select('day, resting_hr').gte('day', desde).not('resting_hr', 'is', null),
-    carregarNoites(1, hoje),
+  const desde14 = somarDias(hoje, -14);
+  const desde35 = somarDias(hoje, -34);
+  const [a, m, d] = desde35.split('-').map(Number);
+  const [fc, noites, checkins, treinos, logs, perfil, pesagens, historico] = await Promise.all([
+    supabase.from('daily_activity').select('day, resting_hr').gte('day', desde14).not('resting_hr', 'is', null),
+    carregarNoites(3, hoje),
     carregarCheckins(1, hoje),
+    supabase.from('workouts').select('id, source, started_at, ended_at').gte('started_at', new Date(a, m - 1, d).toISOString()),
+    supabase.from('activity_logs').select('workout_id, intensity').eq('status', 'feito').gte('day', desde35),
+    carregarPerfil(),
+    carregarPesagens(35),
+    carregarHistorico28(hoje),
   ]);
-  if (fc.error) throw fc.error;
+  for (const r of [fc, treinos, logs]) if (r.error) throw r.error;
+
+  // Carga de cada treino = minutos × intensidade (0–10): leve 3, moderada 5, intensa 7; sem informação, 5.
+  const INTENSIDADE: Record<string, number> = { leve: 3, moderada: 5, intensa: 7 };
+  const intensidadeDe = new Map((logs.data ?? []).filter((l) => l.workout_id != null).map((l) => [l.workout_id as number, INTENSIDADE[l.intensity as string] ?? 5]));
+  const cargas = (treinos.data ?? []).flatMap((t) => {
+    if (!t.ended_at) return [];
+    const min = (Date.parse(t.ended_at as string) - Date.parse(t.started_at as string)) / 60_000;
+    if (min < 2) return [];
+    return [{ dia: diaLocal(new Date(t.started_at as string)), carga: Math.round(min * (intensidadeDe.get(t.id as number) ?? 5)) }];
+  });
+
+  const analise = analisar({ perfil, pesagens, ...historico, hoje });
+  const deficits3 = Array.from({ length: 3 }, (_, i) => analise.balancoDe(somarDias(hoje, -3 + i)).deficit).filter((x): x is number => x != null);
+
   const lista = (fc.data ?? []) as { day: string; resting_hr: number }[];
   const fcHoje = lista.find((x) => x.day === hoje)?.resting_hr ?? null;
   const anteriores = lista.filter((x) => x.day < hoje).map((x) => Number(x.resting_hr));
+  const ultimaNoite = noites.find((n) => n.dia === hoje)?.duracaoMin ?? null;
+  const c = checkins.find((x) => x.dia === hoje);
   return prontidao({
+    hoje,
+    energia: c?.energia ?? null,
+    dor: c?.dor ?? null,
+    humor: c?.humor ?? null,
+    sonoMin: ultimaNoite,
+    sono3Min: noites.length >= 2 ? Math.round(noites.reduce((s, n) => s + n.duracaoMin, 0) / noites.length) : null,
+    cargas,
+    deficits3,
     fcHoje: fcHoje != null ? Number(fcHoje) : null,
     fcMedia: anteriores.length >= 5 ? anteriores.reduce((s, x) => s + x, 0) / anteriores.length : null,
-    sonoMin: noites.find((n) => n.dia === hoje)?.duracaoMin ?? null,
-    energia: checkins.find((c) => c.dia === hoje)?.energia ?? null,
   });
 }

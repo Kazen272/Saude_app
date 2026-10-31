@@ -10,6 +10,7 @@ import { apagarAgua, apagarCorpo, apagarSonoManual, carregarRegistrosDoDia, corr
 import { decimal, diaLocal, milhar, nomeDoDia, numeroCurto } from '@/lib/datas';
 import { sincronizar } from '@/lib/healthconnect';
 import { COLUNAS_EXTRAS, type Valores } from '@/lib/medidas';
+import type { CampoCheckin } from '@/lib/bemestar';
 import { cores } from '@/lib/tema';
 
 const extras = (v: Valores) => COLUNAS_EXTRAS.filter((c) => v[c] != null).length;
@@ -66,8 +67,8 @@ export default function Historico() {
     ]);
   }
 
-  async function mudarCheckin(campo: 'energia' | 'fome' | 'humor', v: number) {
-    setR((x) => (x ? { ...x, checkin: { energia: null, fome: null, humor: null, ...x.checkin, [campo]: v } } : x));
+  async function mudarCheckin(campo: CampoCheckin, v: number) {
+    setR((x) => (x ? { ...x, checkin: { energia: null, fome: null, humor: null, dor: null, ...x.checkin, [campo]: v } } : x));
     try {
       await salvarCheckin(dia, { [campo]: v });
     } catch {
@@ -291,6 +292,7 @@ export default function Historico() {
         <Escala campo="energia" valor={r?.checkin?.energia ?? null} aoEscolher={(v) => mudarCheckin('energia', v)} />
         <Escala campo="fome" valor={r?.checkin?.fome ?? null} aoEscolher={(v) => mudarCheckin('fome', v)} />
         <Escala campo="humor" valor={r?.checkin?.humor ?? null} aoEscolher={(v) => mudarCheckin('humor', v)} />
+        <Escala campo="dor" valor={r?.checkin?.dor ?? null} aoEscolher={(v) => mudarCheckin('dor', v)} />
       </Cartao>
 
       <CartaoAtividadesDoDia dia={dia} />
