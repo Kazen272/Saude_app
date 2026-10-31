@@ -16,9 +16,9 @@ const registros: RegistroMedidas[] = [
 ];
 
 describe('medidas', () => {
-  it('tem 15 colunas, 13 delas em "Mais medidas"', () => {
-    assert.equal(COLUNAS.length, 15);
-    assert.equal(COLUNAS_EXTRAS.length, 13);
+  it('tem 15 medidas de fita + 7 dobras; só cintura e quadril ficam fora de "Mais medidas"', () => {
+    assert.equal(COLUNAS.length, 22);
+    assert.equal(COLUNAS_EXTRAS.length, 20);
   });
 
   it('série ordena por data e pula dias sem a medida', () => {

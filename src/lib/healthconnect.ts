@@ -424,6 +424,9 @@ async function executarSincronizacao(): Promise<EstadoSync> {
           protein_g: g(x.result.PROTEIN_TOTAL),
           carbs_g: g(x.result.TOTAL_CARBOHYDRATE_TOTAL),
           fat_g: g(x.result.TOTAL_FAT_TOTAL),
+          fiber_g: g(x.result.DIETARY_FIBER_TOTAL),
+          sugar_g: g(x.result.SUGAR_TOTAL),
+          sodium_mg: x.result.SODIUM_TOTAL?.inGrams != null ? Math.round(x.result.SODIUM_TOTAL.inGrams * 1000) : null,
           source: 'health_connect',
           synced_at: new Date().toISOString(),
         }));

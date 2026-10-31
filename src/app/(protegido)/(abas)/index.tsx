@@ -4,13 +4,16 @@ import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CartaoCheckin, CartaoSono } from '@/components/bemestar';
-import { Botao, Cabecalho, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
+import { BotaoInfo, Botao, Cabecalho, Cartao, Nota, Pilula, Rotulo, estilos } from '@/components/ui';
 import { alertaDeficitAgressivo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
 import { carregarCheckins, carregarNoites, salvarCheckin } from '@/lib/bemestar-dados';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { LIMITE_RITMO_PCT } from '@/lib/calculos';
-import { apagarAgua, carregarResumoDoDia, registrarAgua, type ResumoDoDia } from '@/lib/dados';
+import { apagarAgua, carregarProntidao, carregarResumoDoDia, registrarAgua, type ResumoDoDia } from '@/lib/dados';
+import type { Prontidao } from '@/lib/analises';
+import { EXPLICACOES } from '@/lib/explicacoes';
+import { CartaoProntidao } from '@/components/analises';
 import { CartaoAtividadesDoDia } from '@/components/atividades';
 import { dataPorExtenso, decimal, diaCurto, diaLocal, milhar } from '@/lib/datas';
 import { lerEstado, nomeDoApp, sincronizar, sincronizarSeLiberado, type EstadoSync } from '@/lib/healthconnect';
@@ -18,6 +21,7 @@ import { cores } from '@/lib/tema';
 
 export default function Hoje() {
   const [resumo, setResumo] = useState<ResumoDoDia | null>(null);
+  const [prontidao, setProntidao] = useState<Prontidao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [atualizando, setAtualizando] = useState(false);
   const [salvandoAgua, setSalvandoAgua] = useState(false);
@@ -29,8 +33,9 @@ export default function Hoje() {
   const carregar = useCallback(async () => {
     try {
       setErro(null);
-      const [r, n, c, e] = await Promise.all([carregarResumoDoDia(), carregarNoites(7), carregarCheckins(3), lerEstado()]);
+      const [r, n, c, e, pr] = await Promise.all([carregarResumoDoDia(), carregarNoites(7), carregarCheckins(3), lerEstado(), carregarProntidao().catch(() => null)]);
       setResumo(r);
+      setProntidao(pr);
       setNoites(n);
       setCheckins(c);
       setSync(e);
@@ -173,6 +178,7 @@ export default function Hoje() {
 
         {resumo && <CartaoCheckin checkin={checkinHoje} alerta={alertaDeficitAgressivo(checkins)} aoMudar={mudarCheckin} />}
         {resumo && <CartaoSono ultima={noites.at(-1) ?? null} resumo={resumirSono(noites)} />}
+        <CartaoProntidao p={prontidao} />
         <CartaoAtividadesDoDia dia={diaLocal()} ocultarSeVazio />
         {resumo && <CartaoTreino resumo={resumo} />}
         {resumo && <CartaoRelogio resumo={resumo} sync={sync} />}
@@ -223,10 +229,13 @@ function CartaoBalanco({ resumo }: { resumo: ResumoDoDia }) {
     <View style={{ backgroundColor: cores.painel, borderRadius: 22, padding: 20, gap: 16 }}>
       <View style={{ gap: 4 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Calorias de hoje</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: cores.escuroSuave }}>Calorias de hoje</Text>
+            <BotaoInfo info={EXPLICACOES.metaDoDia} />
+          </View>
           {plano && (
             <View style={{ backgroundColor: cores.escuroTrilho, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: cores.escuroSuave }}>meta: {kcal(plano.metaDeficit)} de déficit</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: cores.escuroSuave }}>meta de hoje ≈ {milhar(arred50(plano.gastoPrevisto - plano.metaDeficit))} kcal</Text>
             </View>
           )}
         </View>

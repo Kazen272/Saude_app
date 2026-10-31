@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgTexto } from 'react-native-svg';
 
-import { Cartao, Nota, Rotulo, useLarguraDoCartao } from '@/components/ui';
+import { CabecalhoCartao, Cartao, Nota, useLarguraDoCartao } from '@/components/ui';
 import type { NivelCintura } from '@/lib/calculos';
 import { decimal, diaCurto } from '@/lib/datas';
+import { EXPLICACOES } from '@/lib/explicacoes';
 import { tom, type Ponto, type ResumoMedida } from '@/lib/medidas';
 import { cores, porTema } from '@/lib/tema';
 
@@ -58,7 +59,7 @@ export function CartaoMedidas({
   if (!medidas?.length) {
     return (
       <Cartao estilo={{ gap: 4 }}>
-        <Rotulo>Medidas (cm)</Rotulo>
+        <CabecalhoCartao titulo="Medidas (cm)" info={EXPLICACOES.medidas} />
         <Nota>Registre cintura e quadril 1 vez por semana na aba Registrar (e as outras medidas quando fizer avaliação). Elas mostram a perda de gordura melhor que o peso.</Nota>
       </Cartao>
     );
@@ -70,10 +71,11 @@ export function CartaoMedidas({
 
   return (
     <Cartao estilo={{ gap: 12 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-        <Rotulo>Medidas (cm)</Rotulo>
-        <Text style={{ fontSize: 12, color: cores.cinza }}>última: {diaCurto(ultimoDia)}</Text>
-      </View>
+      <CabecalhoCartao
+        titulo="Medidas (cm)"
+        info={EXPLICACOES.medidas}
+        direita={<Text style={{ fontSize: 12, color: cores.cinza }}>última: {diaCurto(ultimoDia)}</Text>}
+      />
 
       <View style={{ flexDirection: 'row', gap: 4, backgroundColor: cores.segmento, borderRadius: 12, padding: 4 }}>
         {(

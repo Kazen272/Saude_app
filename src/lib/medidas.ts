@@ -15,7 +15,14 @@ export type Coluna =
   | 'thigh_l_cm'
   | 'thigh_r_cm'
   | 'calf_l_cm'
-  | 'calf_r_cm';
+  | 'calf_r_cm'
+  | 'sf_chest_mm'
+  | 'sf_axillary_mm'
+  | 'sf_triceps_mm'
+  | 'sf_subscapular_mm'
+  | 'sf_abdominal_mm'
+  | 'sf_suprailiac_mm'
+  | 'sf_thigh_mm';
 
 export type Grupo = 'principal' | 'tronco' | 'bracos' | 'pernas';
 
@@ -42,9 +49,21 @@ export const MEDIDAS: Medida[] = [
   { codigo: 'panturrilha', nome: 'Panturrilha', grupo: 'pernas', colunas: ['calf_l_cm', 'calf_r_cm'], menorEhMelhor: false },
 ];
 
-export const COLUNAS: Coluna[] = MEDIDAS.flatMap((m) => m.colunas);
+/** Dobras cutâneas do protocolo de 7 dobras (em mm), na ordem da avaliação. */
+export const DOBRAS: { coluna: Coluna; nome: string }[] = [
+  { coluna: 'sf_chest_mm', nome: 'Peitoral' },
+  { coluna: 'sf_axillary_mm', nome: 'Axilar média' },
+  { coluna: 'sf_triceps_mm', nome: 'Tríceps' },
+  { coluna: 'sf_subscapular_mm', nome: 'Subescapular' },
+  { coluna: 'sf_abdominal_mm', nome: 'Abdominal' },
+  { coluna: 'sf_suprailiac_mm', nome: 'Supra-ilíaca' },
+  { coluna: 'sf_thigh_mm', nome: 'Coxa' },
+];
+
+/** Tudo o que o formulário do Registrar salva: perimetria (cm) e dobras (mm). */
+export const COLUNAS: Coluna[] = [...MEDIDAS.flatMap((m) => m.colunas), ...DOBRAS.map((d) => d.coluna)];
 /** As que ficam em "Mais medidas" (cintura e quadril aparecem sempre). */
-export const COLUNAS_EXTRAS: Coluna[] = MEDIDAS.filter((m) => m.grupo !== 'principal').flatMap((m) => m.colunas);
+export const COLUNAS_EXTRAS: Coluna[] = COLUNAS.filter((c) => c !== 'waist_cm' && c !== 'hip_cm');
 
 export const medidaPorCodigo = (codigo: string) => MEDIDAS.find((m) => m.codigo === codigo);
 

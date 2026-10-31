@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Botao, Cabecalho, Campo, Cartao, LinhaCampos, Nota, Rotulo, SeletorDia, estilos } from '@/components/ui';
 import { mediaMovel } from '@/lib/calculos';
 import { carregarMedidas, carregarPesagens, carregarRegistrosDoDia, registrarAgua, registrarCorpo } from '@/lib/dados';
-import { COLUNAS, COLUNAS_EXTRAS, MEDIDAS, ultimosValores, type Coluna, type Grupo, type Valores } from '@/lib/medidas';
+import { COLUNAS, COLUNAS_EXTRAS, DOBRAS, MEDIDAS, ultimosValores, type Coluna, type Grupo, type Valores } from '@/lib/medidas';
 import { decimal, diaLocal } from '@/lib/datas';
 import { cores } from '@/lib/tema';
 
@@ -175,7 +175,7 @@ export default function Registrar() {
                 <Text style={{ fontSize: 15, fontWeight: '700', color: cores.verdeEscuro }}>{maisAberto ? 'Menos medidas' : 'Mais medidas'}</Text>
                 {!maisAberto && (
                   <Text style={{ fontSize: 12, color: cores.tintaSuave }}>
-                    {extrasPreenchidas > 0 ? `${extrasPreenchidas} preenchida${extrasPreenchidas === 1 ? '' : 's'} neste dia` : 'ombro, tórax, abdômen, braços e pernas'}
+                    {extrasPreenchidas > 0 ? `${extrasPreenchidas} preenchida${extrasPreenchidas === 1 ? '' : 's'} neste dia` : 'ombro, tórax, abdômen, braços, pernas e dobras'}
                   </Text>
                 )}
               </View>
@@ -213,6 +213,19 @@ export default function Registrar() {
                     ))}
                   </View>
                 ))}
+                <View style={{ gap: 8 }}>
+                  <TituloGrupo texto="Dobras cutâneas (mm)" />
+                  <Nota>Da avaliação física (protocolo de 7 dobras). Com as 7 preenchidas, o app calcula o % de gordura.</Nota>
+                  {[DOBRAS.slice(0, 3), DOBRAS.slice(3, 6), DOBRAS.slice(6)].map((linha, i) => (
+                    <LinhaCampos key={i}>
+                      {linha.map((d) => (
+                        <CampoMedida key={d.coluna} coluna={d.coluna} rotulo={d.nome} medidas={medidas} ultimas={ultimas} aoMudar={mudarMedida} />
+                      ))}
+                      {linha.length === 1 ? <View /> : null}
+                      {linha.length === 1 ? <View /> : null}
+                    </LinhaCampos>
+                  ))}
+                </View>
               </View>
             )}
             <Nota>

@@ -1,5 +1,5 @@
-import { Children, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextInputProps, type ViewStyle } from 'react-native';
+import { Children, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { diaLocal, mascaraData, mascaraHora, nomeDoDia, somarDias } from '@/lib/datas';
 import { cores, porTema, raio } from '@/lib/tema';
@@ -34,6 +34,59 @@ export function Rotulo({ children }: { children: ReactNode }) {
 
 export function Nota({ children }: { children: ReactNode }) {
   return <Text style={estilos.nota}>{children}</Text>;
+}
+
+/** Explicação de um cartão: o que mostra e como é calculado. Parágrafos separados. */
+export type TextoInfo = { titulo: string; paragrafos: string[] };
+
+/** Botão ⓘ que abre a explicação num painel por cima da tela. */
+export function BotaoInfo({ info }: { info: TextoInfo }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Como funciona: ${info.titulo}`}
+        onPress={() => setAberto(true)}
+        hitSlop={10}
+        style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.linhaSuave }}
+      >
+        <Text style={{ fontSize: 14, fontWeight: '800', color: cores.tintaSuave }}>?</Text>
+      </Pressable>
+      <Modal visible={aberto} transparent animationType="fade" onRequestClose={() => setAberto(false)}>
+        <Pressable accessibilityLabel="Fechar" onPress={() => setAberto(false)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
+          <Pressable
+            onPress={() => {}}
+            style={{ backgroundColor: cores.cartao, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 32, gap: 12, maxHeight: '80%' }}
+          >
+            <Text accessibilityRole="header" style={{ fontSize: 18, fontWeight: '800', color: cores.tinta }}>
+              {info.titulo}
+            </Text>
+            <ScrollView contentContainerStyle={{ gap: 10 }}>
+              {info.paragrafos.map((p, i) => (
+                <Text key={i} style={{ fontSize: 14, lineHeight: 20, color: cores.tintaSuave }}>
+                  {p}
+                </Text>
+              ))}
+            </ScrollView>
+            <Botao titulo="Entendi" variante="suave" aoTocar={() => setAberto(false)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+/** Cabeçalho de cartão: rótulo, botão ⓘ e algo à direita (ex.: período). */
+export function CabecalhoCartao({ titulo, info, direita }: { titulo: string; info?: TextoInfo; direita?: ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Text style={[estilos.rotulo, { flexShrink: 1 }]}>{titulo}</Text>
+      {info && <BotaoInfo info={info} />}
+      <View style={{ flex: 1 }} />
+      {direita}
+    </View>
+  );
 }
 
 type Variante = 'principal' | 'suave' | 'agua';

@@ -18,7 +18,7 @@ import {
   type NivelCintura,
   type PlanoDoDia,
 } from './calculos';
-import { diaLocal, limitesDoDia, porSemana, somarDias } from './datas';
+import { diaLocal, inicioDaSemana, limitesDoDia, porSemana, somarDias } from './datas';
 import { alertaDeficitAgressivo, mediaCampo, resumirSono } from './bemestar';
 import { carregarCheckins, carregarNoites } from './bemestar-dados';
 import {
@@ -32,9 +32,23 @@ import {
   type PrevistoReal,
   type ResumoPeriodo,
 } from './relatorios';
-import { COLUNAS, MEDIDAS, resumir, type RegistroMedidas, type ResumoMedida, type Valores } from './medidas';
+import { COLUNAS, DOBRAS, MEDIDAS, resumir, type RegistroMedidas, type ResumoMedida, type Valores } from './medidas';
 import { supabase } from './supabase';
 import { kcalDoTreino, kcalTreinosPorDia, type TreinoParaGasto } from './treinos';
+import {
+  constanciaDaSemana,
+  encontrarPadroes,
+  gorduraPollock7,
+  prontidao,
+  sequencias,
+  sinaisDoCorpo,
+  type Constancia,
+  type DiaConsolidado,
+  type Padrao,
+  type Prontidao,
+  type Sequencias,
+  type SinalCorpo,
+} from './analises';
 
 export type Perfil = {
   id: string;
@@ -641,4 +655,171 @@ export async function corrigirDieta(
 export async function removerCorrecaoDieta(dia: string): Promise<void> {
   const { error } = await supabase.from('nutrition_days').delete().eq('day', dia).eq('source', 'manual');
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Análises (Progresso › Resumo e Hoje › Recuperação)
+
+export type Analises = {
+  padroes: Padrao[];
+  constancia: Constancia;
+  /** Nota das últimas 8 semanas (seg–dom); a última é a atual, ainda incompleta. */
+  constanciaSemanas: { semana: string; nota: number }[];
+  sequencias: Sequencias;
+  sinais: SinalCorpo[];
+  gordura: { dia: string; pct: number; massaGordaKg: number | null; massaMagraKg: number | null }[];
+  dieta7: { proteinaGkg: number | null; fibra: number | null; sodioMg: number | null; acucar: number | null; dias: number };
+  metaAguaMl: number;
+};
+
+/** Junta 60 dias de tudo num dia consolidado por data. */
+async function diasConsolidados(hoje: string, n: number, gastoDe?: (dia: string) => number | null): Promise<DiaConsolidado[]> {
+  const desde = somarDias(hoje, -(n - 1));
+  const [a, m, d] = desde.split('-').map(Number);
+  const inicioIso = new Date(a, m - 1, d).toISOString();
+  const [nutri, agua, treinos, logs, pesos, noites, checkins] = await Promise.all([
+    supabase.from('nutrition_days').select('day, kcal').gte('day', desde),
+    supabase.from('water_entries').select('amount_ml, logged_at').gte('logged_at', inicioIso),
+    supabase.from('workouts').select('started_at').gte('started_at', inicioIso),
+    supabase.from('activity_logs').select('day').eq('status', 'feito').gte('day', desde),
+    supabase.from('body_entries').select('measured_on').not('weight_kg', 'is', null).gte('measured_on', desde),
+    carregarNoites(n, hoje),
+    carregarCheckins(n, hoje),
+  ]);
+  for (const r of [nutri, agua, treinos, logs, pesos]) if (r.error) throw r.error;
+  const aguaDia = new Map<string, number>();
+  for (const w of agua.data ?? []) {
+    const k = diaLocal(new Date(w.logged_at as string));
+    aguaDia.set(k, (aguaDia.get(k) ?? 0) + Number(w.amount_ml));
+  }
+  const treinou = new Set([
+    ...(treinos.data ?? []).map((t) => diaLocal(new Date(t.started_at as string))),
+    ...(logs.data ?? []).map((l) => l.day as string),
+  ]);
+  const pesou = new Set((pesos.data ?? []).map((p) => p.measured_on as string));
+  return Array.from({ length: n }, (_, i) => {
+    const dia = somarDias(desde, i);
+    const nu = (nutri.data ?? []).find((x) => x.day === dia);
+    const c = checkins.find((x) => x.dia === dia);
+    return {
+      dia,
+      consumo: nu && Number(nu.kcal) > 0 ? Number(nu.kcal) : null,
+      gasto: gastoDe ? gastoDe(dia) : null,
+      sonoMin: noites.find((x) => x.dia === dia)?.duracaoMin ?? null,
+      fome: c?.fome ?? null,
+      energia: c?.energia ?? null,
+      humor: c?.humor ?? null,
+      treinou: treinou.has(dia),
+      aguaMl: aguaDia.get(dia) ?? 0,
+      pesou: pesou.has(dia),
+    };
+  });
+}
+
+export async function carregarAnalises(): Promise<Analises> {
+  const hoje = diaLocal();
+  const [perfil, pesagens, historico, medidas, dobras] = await Promise.all([
+    carregarPerfil(),
+    carregarPesagens(70),
+    carregarHistorico28(hoje),
+    carregarMedidas(),
+    supabase
+      .from('body_entries')
+      .select('measured_on, weight_kg, sf_chest_mm, sf_axillary_mm, sf_triceps_mm, sf_subscapular_mm, sf_abdominal_mm, sf_suprailiac_mm, sf_thigh_mm')
+      .not('sf_thigh_mm', 'is', null)
+      .order('measured_on'),
+  ]);
+  if (dobras.error) throw dobras.error;
+  const analise = analisar({ perfil, pesagens, ...historico, hoje });
+  const dias = await diasConsolidados(hoje, 60, (d) => (d < hoje ? analise.balancoDe(d).gasto : null));
+  const ateOntem = dias.filter((d) => d.dia < hoje);
+  const metaAguaMl = perfil.water_goal_ml;
+
+  // Constância: últimas 8 semanas seg–dom (a atual vai até hoje)
+  const segunda = inicioDaSemana(hoje);
+  const constanciaSemanas = Array.from({ length: 8 }, (_, i) => {
+    const ini = somarDias(segunda, -7 * (7 - i));
+    const semana = dias.filter((d) => d.dia >= ini && d.dia <= somarDias(ini, 6));
+    return { semana: ini, nota: constanciaDaSemana(semana, metaAguaMl).nota };
+  });
+
+  // Platô e recomposição
+  const mediaEm = (dia: string) => [...analise.medias].reverse().find((p) => p.dia <= dia)?.pesoKg ?? null;
+  const cinturas = medidas.filter((r) => r.valores.waist_cm != null).map((r) => ({ dia: r.dia, cm: r.valores.waist_cm as number }));
+  const cinturaAtual = cinturas.at(-1) ?? null;
+  const cinturaAntes = cinturaAtual ? ([...cinturas].reverse().find((c) => Date.parse(cinturaAtual.dia) - Date.parse(c.dia) >= 21 * 86_400_000) ?? null) : null;
+  const deficits14 = Array.from({ length: 14 }, (_, i) => analise.balancoDe(somarDias(hoje, -14 + i)).deficit).filter((x): x is number => x != null);
+
+  // % de gordura pelas dobras
+  const idade = perfil.birth_date ? idadeEmAnos(perfil.birth_date, hoje) : null;
+  const gordura = (dobras.data ?? []).flatMap((r) => {
+    const mm = DOBRAS.map((x) => (r as Record<string, unknown>)[x.coluna]).map((v) => (v == null ? NaN : Number(v)));
+    const pct = idade != null && perfil.sex ? gorduraPollock7(mm, idade, perfil.sex) : null;
+    if (pct == null) return [];
+    const peso = r.weight_kg != null ? Number(r.weight_kg) : (pesagens.filter((p) => p.dia <= (r.measured_on as string)).at(-1)?.pesoKg ?? null);
+    return [
+      {
+        dia: r.measured_on as string,
+        pct,
+        massaGordaKg: peso != null ? Math.round(peso * pct) / 100 : null,
+        massaMagraKg: peso != null ? Math.round(peso * (100 - pct)) / 100 : null,
+      },
+    ];
+  });
+
+  // Dieta dos 7 dias completos
+  const ini7 = somarDias(hoje, -7);
+  const { data: n7, error: e7 } = await supabase.from('nutrition_days').select('protein_g, fiber_g, sodium_mg, sugar_g, kcal').gte('day', ini7).lt('day', hoje);
+  if (e7) throw e7;
+  const comDieta = (n7 ?? []).filter((x) => Number(x.kcal) > 0);
+  const med = (campo: 'protein_g' | 'fiber_g' | 'sodium_mg' | 'sugar_g') => {
+    const v = comDieta.map((x) => x[campo]).filter((x) => x != null).map(Number);
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+  };
+  const prot = med('protein_g');
+
+  return {
+    padroes: encontrarPadroes(dias),
+    constancia: constanciaDaSemana(ateOntem.slice(-7), metaAguaMl),
+    constanciaSemanas,
+    sequencias: sequencias(ateOntem, metaAguaMl),
+    sinais: sinaisDoCorpo({
+      mediaHoje: analise.pesoRef,
+      media14Atras: mediaEm(somarDias(hoje, -14)),
+      deficits14,
+      cinturaAtual,
+      cinturaAntes,
+      mediaNoDiaDaCinturaAntes: cinturaAntes ? mediaEm(cinturaAntes.dia) : null,
+    }),
+    gordura,
+    dieta7: {
+      proteinaGkg: prot != null && analise.pesoRef ? Math.round((prot / analise.pesoRef) * 10) / 10 : null,
+      fibra: med('fiber_g'),
+      sodioMg: med('sodium_mg'),
+      acucar: med('sugar_g'),
+      dias: comDieta.length,
+    },
+    metaAguaMl,
+  };
+}
+
+/** Recuperação de hoje (tela Hoje): FC de repouso × média de 14 dias, sono da noite e energia. */
+export async function carregarProntidao(): Promise<Prontidao | null> {
+  const hoje = diaLocal();
+  const desde = somarDias(hoje, -14);
+  const [fc, noites, checkins] = await Promise.all([
+    supabase.from('daily_activity').select('day, resting_hr').gte('day', desde).not('resting_hr', 'is', null),
+    carregarNoites(1, hoje),
+    carregarCheckins(1, hoje),
+  ]);
+  if (fc.error) throw fc.error;
+  const lista = (fc.data ?? []) as { day: string; resting_hr: number }[];
+  const fcHoje = lista.find((x) => x.day === hoje)?.resting_hr ?? null;
+  const anteriores = lista.filter((x) => x.day < hoje).map((x) => Number(x.resting_hr));
+  return prontidao({
+    fcHoje: fcHoje != null ? Number(fcHoje) : null,
+    fcMedia: anteriores.length >= 5 ? anteriores.reduce((s, x) => s + x, 0) / anteriores.length : null,
+    sonoMin: noites.find((n) => n.dia === hoje)?.duracaoMin ?? null,
+    energia: checkins.find((c) => c.dia === hoje)?.energia ?? null,
+  });
 }
