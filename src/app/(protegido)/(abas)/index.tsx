@@ -321,30 +321,28 @@ function LinhaBalanco({ titulo, valor, fracao, cor }: { titulo: string; valor: n
 }
 
 function CartaoTreino({ resumo }: { resumo: ResumoDoDia }) {
-  const treino = resumo.treinos.at(-1);
+  const treinos = resumo.treinos;
   return (
-    <Cartao estilo={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: cores.cinza }}>
-          Treino de hoje{treino?.origin_app ? ` · ${nomeDoApp(treino.origin_app)}` : ''}
-        </Text>
-        {treino ? (
-          <>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: cores.tinta }}>{treino.title ?? 'Treino'}</Text>
+    <Cartao estilo={{ gap: 6 }}>
+      <Text style={{ fontSize: 12, fontWeight: '700', color: cores.cinza }}>{treinos.length > 1 ? `Treinos de hoje · ${treinos.length}` : 'Treino de hoje'}</Text>
+      {treinos.length === 0 && <Nota>Nenhum treino importado hoje.</Nota>}
+      {treinos.map((t, i) => (
+        <View key={`${t.started_at}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: cores.tinta }}>{t.title ?? 'Treino'}</Text>
             <Nota>
               {[
-                treino.ended_at ? `${Math.round((Date.parse(treino.ended_at) - Date.parse(treino.started_at)) / 60000)} min` : null,
-                treino.active_kcal != null ? `${milhar(treino.active_kcal)} kcal` : null,
+                t.origin_app ? nomeDoApp(t.origin_app) : null,
+                t.ended_at ? `${Math.round((Date.parse(t.ended_at) - Date.parse(t.started_at)) / 60000)} min` : null,
+                t.kcal ? `${t.kcal.estimado ? '≈ ' : ''}${milhar(t.kcal.kcal)} kcal${t.kcal.estimado ? ' (estimativa)' : ''}` : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}
             </Nota>
-          </>
-        ) : (
-          <Nota>Nenhum treino importado hoje.</Nota>
-        )}
-      </View>
-      {treino && <Pilula texto="Feito" />}
+          </View>
+          <Pilula texto="Feito" />
+        </View>
+      ))}
     </Cartao>
   );
 }

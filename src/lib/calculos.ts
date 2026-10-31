@@ -49,6 +49,8 @@ export function gastoDiario(p: {
   /** Passos do dia: sem calorias do relógio, viram gasto de atividade (≈ 0,04 kcal por passo a cada 70 kg). */
   passos?: number | null;
   pesoKg?: number | null;
+  /** Calorias de treinos que os passos não pegam (musculação, luta…), medidas ou estimadas. */
+  kcalTreinos?: number | null;
 }): { kcal: number; origem: 'relogio' | 'estimativa' } {
   const f = Math.max(0, Math.min(1, p.fracaoDoDia ?? 1));
   const basal = p.tmb * f;
@@ -65,7 +67,7 @@ export function gastoDiario(p: {
     return { kcal: Math.round(p.kcalTotais + ajuste), origem: 'relogio' };
   }
   if (p.passos != null && p.passos > 0 && p.pesoKg) {
-    return { kcal: Math.round(basal + p.passos * 0.04 * (p.pesoKg / 70) + ajuste), origem: 'relogio' };
+    return { kcal: Math.round(basal + p.passos * 0.04 * (p.pesoKg / 70) + (p.kcalTreinos ?? 0) + ajuste), origem: 'relogio' };
   }
   const estimativa = basal * p.fatorAtividade;
   const teto = p.tetoTipico != null && p.tetoTipico > 0 ? p.tetoTipico * f : Infinity;
@@ -117,6 +119,7 @@ export function planoDoDia(p: {
   gastoTipicoRelogio?: number | null;
   passos?: number | null;
   pesoKg?: number | null;
+  kcalTreinos?: number | null;
 }): PlanoDoDia {
   const tipico = p.gastoTipicoRelogio != null && p.gastoTipicoRelogio > 0 ? p.gastoTipicoRelogio : null;
   const f = Math.max(0, Math.min(1, p.fracaoDoDia));
@@ -127,7 +130,7 @@ export function planoDoDia(p: {
     // Resto do dia no ritmo do próprio relógio, quando há histórico dele.
     gasto = p.kcalTotais + (tipico ?? p.tmb) * (1 - f) + ajuste;
   // Só passos: basal do dia inteiro + atividade já feita (sem contar a que ainda virá).
-  else if (p.passos != null && p.passos > 0 && p.pesoKg) gasto = p.tmb + p.passos * 0.04 * (p.pesoKg / 70) + ajuste;
+  else if (p.passos != null && p.passos > 0 && p.pesoKg) gasto = p.tmb + p.passos * 0.04 * (p.pesoKg / 70) + (p.kcalTreinos ?? 0) + ajuste;
   else gasto = p.tmb * p.fatorAtividade + ajuste;
   // Entre a fórmula e o relógio, vale o menor: errar para menos nunca manda comer demais.
   if (tipico != null) gasto = Math.min(gasto, tipico + ajuste);

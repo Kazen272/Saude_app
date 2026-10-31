@@ -340,7 +340,10 @@ async function executarSincronizacao(): Promise<EstadoSync> {
     // --- Treinos (Hevy, relógio...) ---
     let idsTreinos: string[] = [];
     if (tem(concedidas, 'ExerciseSession')) {
-      const sessoes = (await lerTodos('ExerciseSession', inicio)).sort((a, b) => a.startTime.localeCompare(b.startTime));
+      // Sessões de menos de 2 min costumam ser toque sem querer no relógio.
+      const sessoes = (await lerTodos('ExerciseSession', inicio))
+        .filter((x) => Date.parse(x.endTime) - Date.parse(x.startTime) >= 2 * 60_000)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
       // Mesmo treino registrado por dois apps: fica o primeiro (Hevy tem prioridade).
       const prioridade = (o?: string) => (o === 'com.hevy' ? 0 : 1);
       const ordenadas = [...sessoes].sort((a, b) => prioridade(a.metadata?.dataOrigin) - prioridade(b.metadata?.dataOrigin));

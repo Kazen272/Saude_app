@@ -16,6 +16,7 @@ const APPS: Record<string, string> = {
   'com.myfitnesspal.android': 'MyFitnessPal',
   'com.strava': 'Strava',
   android: 'Celular (Android)',
+  saude: 'Saúde',
   'com.google.android.apps.healthdata': 'Health Connect',
 };
 

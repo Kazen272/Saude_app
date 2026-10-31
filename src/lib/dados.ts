@@ -34,6 +34,7 @@ import {
 } from './relatorios';
 import { COLUNAS, MEDIDAS, resumir, type RegistroMedidas, type ResumoMedida, type Valores } from './medidas';
 import { supabase } from './supabase';
+import { kcalDoTreino, kcalTreinosPorDia, type TreinoParaGasto } from './treinos';
 
 export type Perfil = {
   id: string;
@@ -48,7 +49,7 @@ export type Perfil = {
 
 type Atividade = { day: string; steps: number | null; active_kcal: number | null; total_kcal: number | null; resting_hr: number | null; sleep_minutes: number | null };
 type Nutricao = { day: string; kcal: number | null; protein_g: number | null; carbs_g: number | null; fat_g: number | null };
-type Treino = { title: string | null; started_at: string; ended_at: string | null; active_kcal: number | null; origin_app: string | null };
+type Treino = { title: string | null; started_at: string; ended_at: string | null; active_kcal: number | null; origin_app: string | null; kcal?: { kcal: number; estimado: boolean } | null };
 
 export type ResumoDoDia = {
   perfil: Perfil;
@@ -251,8 +252,9 @@ function tipicoDoRelogio(atividades: Atividade[], tmb: number | null, hoje: stri
   return gastoTipicoRelogio(atividades.filter((a) => a.day >= desde && a.day < hoje).map((a) => a.total_kcal), tmb);
 }
 
-function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades: Atividade[], hoje: string, ajusteKcal = 0) {
+function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades: Atividade[], hoje: string, ajusteKcal = 0, treinos: TreinoParaGasto[] = []) {
   const tmb = tmbDoPerfil(perfil, pesoRefKg, hoje);
+  const treinosPorDia = kcalTreinosPorDia(treinos, pesoRefKg);
   const tipico = tipicoDoRelogio(atividades, tmb, hoje);
   const agora = new Date();
   const fracaoHoje = fracaoDoDia(agora.getHours() * 60 + agora.getMinutes());
@@ -271,6 +273,7 @@ function calculadoraDeGasto(perfil: Perfil, pesoRefKg: number | null, atividades
       tetoTipico: tipico,
       passos: a?.steps ?? null,
       pesoKg: pesoRefKg,
+      kcalTreinos: treinosPorDia.get(dia) ?? null,
     });
   };
 }
@@ -283,8 +286,9 @@ export type BalancoDia = DiaBalanco & { deficit: number | null; gastoEstimado: b
  * 2. recalibra o gasto estimado com essa diferença;
  * 3. com o gasto recalibrado, calcula o déficit médio e a projeção da meta.
  */
-function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividade[]; nutricoes: Nutricao[]; hoje: string }) {
+function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividade[]; nutricoes: Nutricao[]; treinos?: TreinoParaGasto[]; hoje: string }) {
   const { perfil, atividades, nutricoes, hoje } = p;
+  const treinos = p.treinos ?? [];
   const medias = mediaMovel(p.pesagens);
   const pesoRef = medias.at(-1)?.pesoKg ?? null;
   const consumoDe = (dia: string) => nutricoes.find((n) => n.day === dia)?.kcal ?? null;
@@ -296,7 +300,7 @@ function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividad
   };
 
   // 1–2. Previsto × real com o gasto sem ajuste.
-  const balancoBruto = balancoCom(calculadoraDeGasto(perfil, pesoRef, atividades, hoje));
+  const balancoBruto = balancoCom(calculadoraDeGasto(perfil, pesoRef, atividades, hoje, 0, treinos));
   let previstoReal: (PrevistoReal & { dias: number }) | null = null;
   let ajusteKcalDia = 0;
   const inicio = medias.find((m) => m.dia >= somarDias(hoje, -27));
@@ -313,7 +317,7 @@ function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividad
   }
 
   // 3. Gasto recalibrado, déficit médio dos últimos 14 dias completos e projeção.
-  const gastoDoDia = calculadoraDeGasto(perfil, pesoRef, atividades, hoje, ajusteKcalDia);
+  const gastoDoDia = calculadoraDeGasto(perfil, pesoRef, atividades, hoje, ajusteKcalDia, treinos);
   const balancoDe = balancoCom(gastoDoDia);
   const deficits14 = Array.from({ length: 14 }, (_, i) => balancoDe(somarDias(hoje, -14 + i)).deficit).filter(
     (d): d is number => d != null,
@@ -330,12 +334,15 @@ function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividad
 /** Lê atividade e nutrição dos últimos 28 dias, base de toda a análise. */
 async function carregarHistorico28(hoje: string) {
   const desde = somarDias(hoje, -27);
-  const [atividades, nutricoes] = await Promise.all([
+  const [a, m, d] = desde.split('-').map(Number);
+  const [atividades, nutricoes, treinos] = await Promise.all([
     supabase.from('daily_activity').select('day, steps, active_kcal, total_kcal, resting_hr, sleep_minutes').gte('day', desde),
     supabase.from('nutrition_days').select('day, kcal, protein_g, carbs_g, fat_g').gte('day', desde),
+    supabase.from('workouts').select('title, started_at, ended_at, active_kcal, origin_app').gte('started_at', new Date(a, m - 1, d).toISOString()),
   ]);
   if (atividades.error) throw atividades.error;
   if (nutricoes.error) throw nutricoes.error;
+  if (treinos.error) throw treinos.error;
   const nutricoesNum = (nutricoes.data ?? []).map((n) => ({
     day: n.day as string,
     kcal: num(n.kcal),
@@ -343,7 +350,14 @@ async function carregarHistorico28(hoje: string) {
     carbs_g: num(n.carbs_g),
     fat_g: num(n.fat_g),
   }));
-  return { atividades: (atividades.data ?? []) as Atividade[], nutricoes: nutricoesNum as Nutricao[] };
+  const treinosGasto: TreinoParaGasto[] = (treinos.data ?? []).map((t) => ({
+    titulo: (t.title as string | null) ?? null,
+    inicio: t.started_at as string,
+    fim: (t.ended_at as string | null) ?? null,
+    kcal: (t.active_kcal as number | null) ?? null,
+    app: (t.origin_app as string | null) ?? null,
+  }));
+  return { atividades: (atividades.data ?? []) as Atividade[], nutricoes: nutricoesNum as Nutricao[], treinos: treinosGasto };
 }
 
 export type Progresso = {
@@ -483,6 +497,7 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
           gastoTipicoRelogio: tipicoDoRelogio(historico.atividades, tmb, hoje),
           passos: atividadeHoje?.steps ?? null,
           pesoKg: analise.pesoRef,
+          kcalTreinos: kcalTreinosPorDia(historico.treinos, analise.pesoRef).get(hoje) ?? null,
         });
 
   return {
@@ -499,7 +514,10 @@ export async function carregarResumoDoDia(): Promise<ResumoDoDia> {
     variacaoSemanaKg,
     aguaMl: (agua.data ?? []).reduce((s, r) => s + Number(r.amount_ml), 0),
     atividade: historico.atividades.find((a) => a.day === hoje) ?? null,
-    treinos: (treinos.data ?? []) as Treino[],
+    treinos: ((treinos.data ?? []) as Treino[]).map((t) => ({
+      ...t,
+      kcal: kcalDoTreino({ titulo: t.title, inicio: t.started_at, fim: t.ended_at, kcal: t.active_kcal, app: t.origin_app }, analise.pesoRef),
+    })),
     consumoKcal: balancoHoje.consumo,
     gasto: analise.gastoDoDia(hoje),
     deficitHoje: balancoHoje.deficit,

@@ -213,3 +213,11 @@ describe('gasto pelos passos', () => {
     assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105, kcalAtivas: 300 }).kcal, 2350);
   });
 });
+
+describe('gasto: passos + treinos', () => {
+  it('sem calorias do relógio, soma os treinos que os passos não pegam', () => {
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105, kcalTreinos: 341 }).kcal, 2991);
+    // com o relógio medindo o dia, os treinos não somam de novo
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, kcalTotais: 2400, confiarNoTotal: true, kcalTreinos: 341 }).kcal, 2400);
+  });
+});
