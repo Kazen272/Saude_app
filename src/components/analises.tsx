@@ -232,3 +232,128 @@ export function CartaoProntidao({ p }: { p: Prontidao | null }) {
     </Cartao>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sua semana × meta (aba Calorias)
+
+export function CartaoSemanaMeta({ a }: { a: Analises | null }) {
+  const m = a?.meta;
+  if (!m) {
+    return (
+      <Cartao estilo={{ gap: 4 }}>
+        <CabecalhoCartao titulo="Sua semana × meta" info={EXPLICACOES.semanaMeta} />
+        <Nota>Defina uma meta em Mais › Meta de calorias (ou complete o perfil para usar a sugerida).</Nota>
+      </Cartao>
+    );
+  }
+  const s = m.semana;
+  const u = m.ultimos7;
+  const pct = u.planejado && u.planejado > 0 && u.conseguido != null ? Math.round((u.conseguido / u.planejado) * 100) : null;
+  return (
+    <Cartao estilo={{ gap: 12 }}>
+      <CabecalhoCartao
+        titulo="Sua semana × meta"
+        info={EXPLICACOES.semanaMeta}
+        direita={<Text style={{ fontSize: 12, color: cores.cinza }}>{m.sugerida ? 'meta sugerida' : 'meta'} {milhar(m.kcal)}/dia</Text>}
+      />
+
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tinta }}>Orçamento da semana</Text>
+          <Text style={{ fontSize: 13, color: cores.tintaSuave, fontVariant: ['tabular-nums'] }}>
+            {milhar(s.usado)} de {milhar(s.orcamento)} kcal
+          </Text>
+        </View>
+        <Barra fracao={s.usado / s.orcamento} cor={s.restante < 0 ? cores.laranja : cores.verde} />
+        <Text style={{ fontSize: 13, color: s.restante < 0 ? cores.laranja : cores.tintaSuave, fontWeight: s.restante < 0 ? '700' : '400' }}>
+          {s.restante >= 0
+            ? `Sobram ${milhar(s.restante)} kcal para ${s.diasRestantes} dia${s.diasRestantes === 1 ? '' : 's'} (≈ ${milhar(s.porDiaRestante)} por dia, contando hoje).`
+            : `${milhar(-s.restante)} kcal acima do orçamento da semana.`}
+        </Text>
+      </View>
+
+      <View style={{ gap: 2, borderTopWidth: 1, borderTopColor: cores.linhaSuave, paddingTop: 10 }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tinta }}>Últimos 7 dias completos</Text>
+        <Linha rotulo="Média comida por dia" valor={u.mediaConsumo != null ? `${milhar(u.mediaConsumo)} kcal` : '—'} destaque={u.mediaConsumo != null && u.mediaConsumo > m.kcal * 1.1 ? 'ruim' : u.mediaConsumo != null ? 'bom' : null} />
+        <Linha rotulo="Dias dentro da meta" valor={u.diasComDieta ? `${u.diasDentro} de ${u.diasComDieta}` : '—'} destaque={null} />
+        <Linha rotulo="Déficit planejado pela meta" valor={u.planejado != null ? `${milhar(u.planejado)} kcal` : '—'} destaque={null} />
+        <Linha rotulo="Déficit conseguido" valor={u.conseguido != null ? `${milhar(u.conseguido)} kcal` : '—'} destaque={u.conseguido != null && u.conseguido < 0 ? 'ruim' : null} />
+      </View>
+      {pct != null && (
+        <View style={{ gap: 6 }}>
+          <Barra fracao={pct / 100} cor={pct >= 80 ? cores.verde : cores.laranja} />
+          <Text style={{ fontSize: 13, color: cores.tintaSuave }}>
+            Você fez {pct}% do déficit planejado
+            {u.conseguido != null ? ` (≈ ${decimal(Math.max(0, u.conseguido) / 7700, 2)} kg de gordura na semana)` : ''}.
+          </Text>
+        </View>
+      )}
+    </Cartao>
+  );
+}
+
+function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque: 'bom' | 'ruim' | null }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 6 }}>
+      <Text style={{ fontSize: 14, color: cores.tintaSuave, flexShrink: 1 }}>{rotulo}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '800', color: destaque === 'ruim' ? cores.laranja : destaque === 'bom' ? cores.verdeTexto : cores.tinta, fontVariant: ['tabular-nums'] }}>
+        {valor}
+      </Text>
+    </View>
+  );
+}
+
+function Barra({ fracao, cor }: { fracao: number; cor: string }) {
+  return (
+    <View style={{ height: 8, borderRadius: 4, backgroundColor: cores.linhaSuave }}>
+      <View style={{ width: `${Math.max(0, Math.min(1, fracao)) * 100}%`, height: 8, borderRadius: 4, backgroundColor: cor }} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Desde o começo (aba Resumo)
+
+export function CartaoDesdeInicio({ a }: { a: Analises | null }) {
+  const d = a?.meta?.desdeInicio;
+  if (!d) return null;
+  const kgBalanca = d.kgNaBalanca;
+  const cintura = d.cintura ? d.cintura.para - d.cintura.de : null;
+  let leitura = '';
+  if (d.diasComDieta < 7) leitura = 'Com poucos dias registrados, os números ainda oscilam bastante.';
+  else if (kgBalanca != null && d.kgPelasCalorias > 0.5 && -kgBalanca < d.kgPelasCalorias / 2)
+    leitura =
+      cintura != null && cintura < -1
+        ? 'A balança caiu menos que as calorias indicam, mas a cintura diminuiu: sinal de perda de gordura com retenção de água ou ganho de músculo.'
+        : 'A balança caiu menos que as calorias indicam. Causas comuns: retenção de água, refeições não registradas ou gasto superestimado. O ajuste do previsto × real corrige isso com o tempo.';
+  else if (kgBalanca != null && -kgBalanca > Math.max(0, d.kgPelasCalorias) * 1.5 + 0.5)
+    leitura = 'A balança caiu mais do que as calorias explicam. No começo de um déficit, parte da queda costuma ser água e glicogênio; com as semanas, as duas linhas tendem a se aproximar.';
+  else if (kgBalanca != null && d.kgPelasCalorias > 0 && -kgBalanca >= d.kgPelasCalorias / 2)
+    leitura = 'Balança e calorias contam a mesma história: o déficit está virando perda de peso.';
+  return (
+    <Cartao estilo={{ gap: 10 }}>
+      <CabecalhoCartao titulo={`Desde o começo · ${diaCurto(d.inicio)}`} info={EXPLICACOES.desdeInicio} />
+      <View style={{ gap: 2 }}>
+        <Text style={{ fontSize: 26, fontWeight: '800', color: d.deficitTotal >= 0 ? cores.tinta : cores.laranja, fontVariant: ['tabular-nums'] }}>
+          {milhar(Math.abs(d.deficitTotal))} kcal de {d.deficitTotal >= 0 ? 'déficit' : 'superávit'}
+        </Text>
+        <Nota>
+          soma de {d.diasComDieta} dia{d.diasComDieta === 1 ? '' : 's'} com dieta registrada, em {d.dias} dia{d.dias === 1 ? '' : 's'}
+        </Nota>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Bloco rotulo="Pelas calorias" valor={`${d.kgPelasCalorias > 0 ? '−' : '+'}${decimal(Math.abs(d.kgPelasCalorias))} kg`} />
+        <Bloco rotulo="Na balança" valor={kgBalanca != null ? `${kgBalanca <= 0 ? '−' : '+'}${decimal(Math.abs(kgBalanca))} kg` : '—'} />
+        <Bloco rotulo="Cintura" valor={cintura != null ? `${cintura <= 0 ? '−' : '+'}${decimal(Math.abs(cintura))} cm` : '—'} />
+      </View>
+      {leitura !== '' && <Text style={{ fontSize: 13, lineHeight: 19, color: cores.tintaSuave }}>{leitura}</Text>}
+      <Text style={{ fontSize: 13, fontWeight: '700', color: cores.tinta }}>Déficit por semana</Text>
+      <GraficoSemanas
+        semanas={d.semanas.map((s) => ({ semana: s.semana, valor: s.deficit != null && s.deficit > 0 ? s.deficit : null }))}
+        formatar={(v) => (v >= 1000 ? `${decimal(v / 1000)} mil` : String(v))}
+        rotulo="Déficit somado por semana"
+        vazio="O déficit de cada semana aparece aqui."
+      />
+    </Cartao>
+  );
+}

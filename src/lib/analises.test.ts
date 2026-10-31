@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { constanciaDaSemana, encontrarPadroes, gorduraPollock7, prontidao, sequencias, sinaisDoCorpo, type DiaConsolidado } from './analises.ts';
+import { desdeOInicio, metaNoPeriodo, semanaAtual, constanciaDaSemana, encontrarPadroes, gorduraPollock7, prontidao, sequencias, sinaisDoCorpo, type DiaConsolidado } from './analises.ts';
 
 const dia = (d: string, p: Partial<DiaConsolidado> = {}): DiaConsolidado => ({
   dia: d,
@@ -80,5 +80,46 @@ describe('gorduraPollock7', () => {
   it('bate com a avaliação (180 mm, 26 anos, homem ≈ 24%)', () => {
     assert.equal(gorduraPollock7([20, 21, 22, 26, 49, 26, 16], 26, 'masculino'), 24.1);
     assert.equal(gorduraPollock7([20, 21], 26, 'masculino'), null);
+  });
+});
+
+
+describe('meta × real', () => {
+  const dias = [
+    { dia: '2026-10-26', consumo: 2100, gasto: 2600 }, // seg
+    { dia: '2026-10-27', consumo: 2300, gasto: 2500 },
+    { dia: '2026-10-28', consumo: null, gasto: 2400 },
+    { dia: '2026-10-29', consumo: 1900, gasto: 2700 },
+  ];
+  it('orçamento da semana', () => {
+    const s = semanaAtual(dias, 2000, '2026-10-29', '2026-10-26');
+    assert.deepEqual(
+      { usado: s.usado, restante: s.restante, diasRestantes: s.diasRestantes, porDia: s.porDiaRestante },
+      { usado: 6300, restante: 7700, diasRestantes: 4, porDia: 1925 },
+    );
+  });
+  it('planejado × conseguido e dias dentro da meta (até 10% acima)', () => {
+    const m = metaNoPeriodo(dias, 2000);
+    assert.equal(m.diasComDieta, 3);
+    assert.equal(m.diasDentro, 2); // 2.100 (≤ 2.200) e 1.900; 2.300 passou
+    assert.equal(m.planejado, 600 + 500 + 700);
+    assert.equal(m.conseguido, 500 + 200 + 800);
+    assert.equal(m.mediaConsumo, 2100);
+  });
+  it('desde o início: total, kg e semanas', () => {
+    const r = desdeOInicio({
+      inicio: '2026-10-26',
+      hoje: '2026-10-31',
+      balancos: dias.map((d) => ({ ...d, deficit: d.consumo != null ? d.gasto - d.consumo : null })),
+      mediaInicio: 105,
+      mediaHoje: 104.6,
+      cinturas: [{ dia: '2026-10-29', cm: 102.5 }],
+      segundaAtual: '2026-10-26',
+    });
+    assert.equal(r.deficitTotal, 1500);
+    assert.equal(r.kgPelasCalorias, 0.2);
+    assert.equal(r.kgNaBalanca, -0.4);
+    assert.equal(r.cintura, null);
+    assert.deepEqual(r.semanas, [{ semana: '2026-10-26', deficit: 1500 }]);
   });
 });

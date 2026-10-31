@@ -56,6 +56,7 @@ preciso gerar um APK novo.
 - [x] Análises: padrões (sono × fome/consumo, fim de semana, treino), constância semanal 0–100 e sequências, recuperação do dia, platô e recomposição, % de gordura por 7 dobras (Jackson & Pollock + Siri), fibra/sódio/açúcar e meta calórica do dia
 - [x] Progresso em abas (Resumo, Corpo, Calorias, Hábitos) e botão ? com a explicação de cada cálculo
 - [x] Meta de calorias: a pessoa escolhe; o app sugere 3 ritmos pelo gasto médio (relógio/passos ou Mifflin-St Jeor × PAL da FAO), com déficits do NHLBI, teto de 1% do peso por semana e pisos de 1.200/1.600 kcal, com as fontes na tela
+- [x] Meta × real: orçamento da semana, média vs. meta, dias dentro da meta, déficit planejado × conseguido, "desde o começo" (calorias × balança × cintura, déficit por semana) e projeção seguindo a meta
 - [x] Modo escuro: seguir o celular, claro ou escuro (Mais → Aparência)
 - [ ] Dieta do FatSecret: entra pelo Health Connect se o FatSecret gravar nutrição lá (a confirmar no celular)
 - [x] Gráficos de progresso: peso com média, meta e projeção; déficit diário; resumo da semana; previsto × real

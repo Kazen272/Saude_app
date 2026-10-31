@@ -263,3 +263,104 @@ export function gorduraPollock7(dobrasMm: number[], idade: number, sexo: Sexo): 
       : 1.097 - 0.00046971 * s + 0.00000056 * s * s - 0.00012828 * idade;
   return Math.round((495 / densidade - 450) * 10) / 10;
 }
+
+// ---------------------------------------------------------------------------
+// Meta de calorias × o que aconteceu
+
+export type DiaMeta = { dia: string; consumo: number | null; gasto: number | null };
+
+/** Tolerância para contar um dia "dentro da meta": até 10% acima. */
+export const TOLERANCIA_META = 0.1;
+
+export type SemanaAtual = {
+  inicio: string;
+  orcamento: number;
+  usado: number;
+  restante: number;
+  /** Dias de hoje até domingo, contando hoje. */
+  diasRestantes: number;
+  porDiaRestante: number;
+  diasComDieta: number;
+};
+
+/** Orçamento da semana (segunda a domingo): meta × 7, quanto já foi comido e quanto sobra. */
+export function semanaAtual(dias: DiaMeta[], metaKcal: number, hoje: string, inicioSemana: string): SemanaAtual {
+  const da = dias.filter((d) => d.dia >= inicioSemana && d.dia <= hoje && d.consumo != null);
+  const usado = da.reduce((s, d) => s + (d.consumo as number), 0);
+  const orcamento = metaKcal * 7;
+  const passados = Math.round((Date.parse(hoje) - Date.parse(inicioSemana)) / 86_400_000);
+  const diasRestantes = 7 - passados;
+  const restante = orcamento - usado;
+  return { inicio: inicioSemana, orcamento, usado, restante, diasRestantes, porDiaRestante: Math.round(restante / diasRestantes), diasComDieta: da.length };
+}
+
+export type MetaPeriodo = {
+  dias: number;
+  diasComDieta: number;
+  mediaConsumo: number | null;
+  diasDentro: number;
+  /** Déficit que a meta daria: soma de (gasto − meta) nos dias com dieta. */
+  planejado: number | null;
+  /** Déficit que aconteceu: soma de (gasto − consumo) nos mesmos dias. */
+  conseguido: number | null;
+};
+
+export function metaNoPeriodo(dias: DiaMeta[], metaKcal: number): MetaPeriodo {
+  const comDieta = dias.filter((d) => d.consumo != null);
+  const comTudo = comDieta.filter((d) => d.gasto != null);
+  return {
+    dias: dias.length,
+    diasComDieta: comDieta.length,
+    mediaConsumo: comDieta.length ? Math.round(comDieta.reduce((s, d) => s + (d.consumo as number), 0) / comDieta.length) : null,
+    diasDentro: comDieta.filter((d) => (d.consumo as number) <= metaKcal * (1 + TOLERANCIA_META)).length,
+    planejado: comTudo.length ? Math.round(comTudo.reduce((s, d) => s + ((d.gasto as number) - metaKcal), 0)) : null,
+    conseguido: comTudo.length ? Math.round(comTudo.reduce((s, d) => s + ((d.gasto as number) - (d.consumo as number)), 0)) : null,
+  };
+}
+
+export type DesdeInicio = {
+  inicio: string;
+  dias: number;
+  diasComDieta: number;
+  deficitTotal: number;
+  /** Gordura equivalente ao déficit (7.700 kcal ≈ 1 kg). */
+  kgPelasCalorias: number;
+  /** Variação da média de 7 dias do peso. */
+  kgNaBalanca: number | null;
+  cintura: { de: number; para: number } | null;
+  /** Déficit somado por semana (segunda a domingo), da mais antiga à atual. */
+  semanas: { semana: string; deficit: number | null }[];
+};
+
+export function desdeOInicio(p: {
+  inicio: string;
+  hoje: string;
+  balancos: (DiaMeta & { deficit: number | null })[];
+  mediaInicio: number | null;
+  mediaHoje: number | null;
+  cinturas: { dia: string; cm: number }[];
+  segundaAtual: string;
+}): DesdeInicio {
+  const dias = p.balancos.filter((b) => b.dia >= p.inicio && b.dia < p.hoje);
+  const comDeficit = dias.filter((b) => b.deficit != null);
+  const total = comDeficit.reduce((s, b) => s + (b.deficit as number), 0);
+  const c = p.cinturas.filter((x) => x.dia >= p.inicio);
+  const semanas: { semana: string; deficit: number | null }[] = [];
+  for (let s = p.segundaAtual; s >= p.inicio || semanas.length === 0; s = new Date(Date.parse(s) - 7 * 86_400_000).toISOString().slice(0, 10)) {
+    const fim = new Date(Date.parse(s) + 6 * 86_400_000).toISOString().slice(0, 10);
+    const daSemana = comDeficit.filter((b) => b.dia >= s && b.dia <= fim);
+    semanas.unshift({ semana: s, deficit: daSemana.length ? daSemana.reduce((a, b) => a + (b.deficit as number), 0) : null });
+    if (semanas.length >= 12) break;
+    if (Date.parse(s) <= Date.parse(p.inicio)) break;
+  }
+  return {
+    inicio: p.inicio,
+    dias: dias.length,
+    diasComDieta: comDeficit.length,
+    deficitTotal: Math.round(total),
+    kgPelasCalorias: Math.round((total / 7700) * 10) / 10,
+    kgNaBalanca: p.mediaInicio != null && p.mediaHoje != null ? Math.round((p.mediaHoje - p.mediaInicio) * 10) / 10 : null,
+    cintura: c.length >= 2 ? { de: c[0].cm, para: c[c.length - 1].cm } : null,
+    semanas,
+  };
+}

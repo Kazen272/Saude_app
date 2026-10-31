@@ -123,4 +123,22 @@ export const EXPLICACOES = {
       'A linha "Até agora" mostra o saldo real do dia, com o gasto medido até o momento.',
     ],
   },
+  semanaMeta: {
+    titulo: 'Sua semana × meta',
+    paragrafos: [
+      'Orçamento da semana = sua meta diária × 7, de segunda a domingo. "Usado" soma o que você comeu nos dias com dieta registrada, incluindo hoje. O que sobra dividido pelos dias que faltam (contando hoje) mostra quanto dá por dia para fechar a semana na meta.',
+      'Últimos 7 dias completos: média do que você comeu, dias dentro da meta (até 10% acima conta como dentro) e o déficit.',
+      'Déficit planejado = soma de (gasto do dia − meta) nos dias com dieta: é o que a meta daria. Conseguido = soma de (gasto − comido) nos mesmos dias. A porcentagem mostra quanto do planejado aconteceu.',
+      'O app usa a meta atual para todos os dias; se você mudar a meta, os dias anteriores passam a ser comparados com a nova.',
+    ],
+  },
+  desdeInicio: {
+    titulo: 'Desde o começo',
+    paragrafos: [
+      'Começa na sua primeira pesagem ou no primeiro dia com dieta registrada no app (o que vier antes).',
+      'Déficit acumulado: soma de (gasto − comido) em todos os dias completos com dieta. "Pelas calorias" converte em gordura usando ≈ 7.700 kcal por kg, uma aproximação; na prática a perda desacelera com o tempo.',
+      'Na balança: diferença da média de 7 dias do peso entre o começo e hoje. Água, sal, intestino e ganho de músculo fazem a balança divergir das calorias por semanas; por isso a cintura ajuda a confirmar.',
+      'O gráfico mostra o déficit somado de cada semana.',
+    ],
+  },
 } satisfies Record<string, TextoInfo>;

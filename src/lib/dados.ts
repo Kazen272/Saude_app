@@ -50,6 +50,12 @@ import {
   type Prontidao,
   type Sequencias,
   type SinalCorpo,
+  desdeOInicio,
+  metaNoPeriodo,
+  semanaAtual,
+  type DesdeInicio,
+  type MetaPeriodo,
+  type SemanaAtual,
 } from './analises';
 
 export type Perfil = {
@@ -353,8 +359,8 @@ function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividad
 }
 
 /** Lê atividade e nutrição dos últimos 28 dias, base de toda a análise. */
-async function carregarHistorico28(hoje: string) {
-  const desde = somarDias(hoje, -27);
+async function carregarHistorico28(hoje: string, dias = 28) {
+  const desde = somarDias(hoje, -(dias - 1));
   const [a, m, d] = desde.split('-').map(Number);
   const [atividades, nutricoes, treinos] = await Promise.all([
     supabase.from('daily_activity').select('day, steps, active_kcal, total_kcal, resting_hr, sleep_minutes').gte('day', desde),
@@ -726,6 +732,17 @@ export type Analises = {
   gordura: { dia: string; pct: number; massaGordaKg: number | null; massaMagraKg: number | null }[];
   dieta7: { proteinaGkg: number | null; fibra: number | null; sodioMg: number | null; acucar: number | null; dias: number };
   metaAguaMl: number;
+  meta: {
+    kcal: number;
+    sugerida: boolean;
+    semana: SemanaAtual;
+    ultimos7: MetaPeriodo;
+    /** Os 7 dias completos, para a coluna da tabela. */
+    dias7: { dia: string; consumo: number | null }[];
+    desdeInicio: DesdeInicio | null;
+    /** Seguindo a meta todo dia: déficit planejado e quando a meta de peso chega. */
+    projecao: { deficitPlanejado: number; projecao: Projecao | null } | null;
+  } | null;
 };
 
 /** Junta 60 dias de tudo num dia consolidado por data. */
@@ -774,10 +791,18 @@ async function diasConsolidados(hoje: string, n: number, gastoDe?: (dia: string)
 
 export async function carregarAnalises(): Promise<Analises> {
   const hoje = diaLocal();
+  // Início do acompanhamento: primeira pesagem ou primeiro dia de dieta (até 1 ano atrás).
+  const [primeiraPesagem, primeiraDieta] = await Promise.all([
+    supabase.from('body_entries').select('measured_on').not('weight_kg', 'is', null).order('measured_on').limit(1).maybeSingle(),
+    supabase.from('nutrition_days').select('day').gt('kcal', 0).order('day').limit(1).maybeSingle(),
+  ]);
+  const candidatos = [primeiraPesagem.data?.measured_on as string | undefined, primeiraDieta.data?.day as string | undefined].filter((x): x is string => !!x);
+  const inicioAcomp = candidatos.length ? candidatos.sort()[0] : null;
+  const diasHistorico = inicioAcomp ? Math.min(365, Math.max(28, Math.round((Date.parse(hoje) - Date.parse(inicioAcomp)) / 86_400_000) + 1)) : 28;
   const [perfil, pesagens, historico, medidas, dobras] = await Promise.all([
     carregarPerfil(),
-    carregarPesagens(70),
-    carregarHistorico28(hoje),
+    carregarPesagens(Math.max(70, diasHistorico + 7)),
+    carregarHistorico28(hoje, diasHistorico),
     carregarMedidas(),
     supabase
       .from('body_entries')
@@ -834,7 +859,52 @@ export async function carregarAnalises(): Promise<Analises> {
   };
   const prot = med('protein_g');
 
+  // Meta de calorias × o que aconteceu
+  const sugestao = sugestaoDeMeta(perfil, analise, hoje);
+  const metaKcal = perfil.calorie_goal ?? (sugestao?.opcoes.find((o) => o.ritmo === 'moderado')?.kcal ?? null);
+  let meta: Analises['meta'] = null;
+  if (metaKcal != null) {
+    const balanco = (d: string) => analise.balancoDe(d);
+    const segunda = inicioDaSemana(hoje);
+    const diasSemana = Array.from({ length: 7 }, (_, i) => somarDias(segunda, i)).filter((d) => d <= hoje).map(balanco);
+    const dias7 = Array.from({ length: 7 }, (_, i) => balanco(somarDias(hoje, -7 + i)));
+    const balancosTodos = inicioAcomp
+      ? Array.from({ length: Math.round((Date.parse(hoje) - Date.parse(inicioAcomp)) / 86_400_000) }, (_, i) => balanco(somarDias(inicioAcomp, i)))
+      : [];
+    const mediaNoInicio = inicioAcomp ? (analise.medias.find((m) => m.dia >= inicioAcomp)?.pesoKg ?? null) : null;
+    const deficitPlanejado = sugestao ? sugestao.gastoBase - metaKcal : null;
+    meta = {
+      kcal: metaKcal,
+      sugerida: perfil.calorie_goal == null,
+      semana: semanaAtual(diasSemana, metaKcal, hoje, segunda),
+      ultimos7: metaNoPeriodo(dias7, metaKcal),
+      dias7: dias7.map((d) => ({ dia: d.dia, consumo: d.consumo })),
+      desdeInicio: inicioAcomp
+        ? desdeOInicio({
+            inicio: inicioAcomp,
+            hoje,
+            balancos: balancosTodos,
+            mediaInicio: mediaNoInicio,
+            mediaHoje: analise.pesoRef,
+            cinturas: medidas.filter((r) => r.valores.waist_cm != null).map((r) => ({ dia: r.dia, cm: r.valores.waist_cm as number })),
+            segundaAtual: segunda,
+          })
+        : null,
+      projecao:
+        deficitPlanejado != null
+          ? {
+              deficitPlanejado,
+              projecao:
+                perfil.goal_weight_kg != null && analise.pesoRef != null
+                  ? projetarMeta({ pesoAtualKg: analise.pesoRef, metaKg: perfil.goal_weight_kg, deficitMedioDiario: deficitPlanejado, hoje })
+                  : null,
+            }
+          : null,
+    };
+  }
+
   return {
+    meta,
     padroes: encontrarPadroes(dias),
     constancia: constanciaDaSemana(ateOntem.slice(-7), metaAguaMl),
     constanciaSemanas,

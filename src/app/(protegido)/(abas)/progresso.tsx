@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradeCheckins, GraficoSono } from '@/components/bemestar';
 import { GraficoPeso, GraficoSemanas } from '@/components/graficos';
 import { CartaoMedidas } from '@/components/medidas';
-import { CartaoConstancia, CartaoGordura, CartaoPadroes, CartaoQualidadeDieta, CartoesSinais } from '@/components/analises';
+import { CartaoConstancia, CartaoDesdeInicio, CartaoGordura, CartaoPadroes, CartaoQualidadeDieta, CartaoSemanaMeta, CartoesSinais } from '@/components/analises';
 import { CabecalhoCartao, Cabecalho, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import { LIMITE_RITMO_PCT } from '@/lib/calculos';
 import { formatarDuracao, mediaCampo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
@@ -129,8 +129,10 @@ export default function Progresso() {
                 {variacao == null ? '—' : `${variacao <= 0 ? '−' : '+'}${decimal(Math.abs(variacao))} kg em 8 semanas`}
               </Text>
               {dados && <TextoProjecao dados={dados} />}
+              <TextoProjecaoMeta a={analises} />
             </Cartao>
             <CartoesSinais a={analises} />
+            <CartaoDesdeInicio a={analises} />
             <CartaoConstancia a={analises} />
             <CartaoPadroes a={analises} />
           </>
@@ -170,6 +172,7 @@ export default function Progresso() {
                 <GraficoPeso medias={dados.medias} pesagens={dados.pesagens} metaKg={dados.perfil.goal_weight_kg} projecao={dados.projecao} hoje={hoje} periodoDias={periodo} />
               )}
               {dados && <TextoProjecao dados={dados} />}
+              <TextoProjecaoMeta a={analises} />
               {dados?.ritmo && (
                 <Text
                   style={{
@@ -193,7 +196,8 @@ export default function Progresso() {
 
         {aba === 'calorias' && (
           <>
-            <CartaoCalorias dados={dados} />
+            <CartaoSemanaMeta a={analises} />
+            <CartaoCalorias dados={dados} metaKcal={analises?.meta?.kcal ?? null} />
             <CartaoQualidadeDieta a={analises} metaProteina={dados?.metaProteina ?? null} />
             <Cartao estilo={{ gap: 6 }}>
               <CabecalhoCartao titulo="Previsto × real" info={EXPLICACOES.previstoReal} />
@@ -280,6 +284,22 @@ export default function Progresso() {
   );
 }
 
+/** Seguindo a meta de calorias todo dia: quando a meta de peso chega. */
+function TextoProjecaoMeta({ a }: { a: Analises | null }) {
+  const m = a?.meta;
+  if (!m?.projecao) return null;
+  const p = m.projecao.projecao;
+  const def = m.projecao.deficitPlanejado;
+  let texto: string;
+  if (def <= 0) texto = `Com a ${m.sugerida ? 'meta sugerida' : 'sua meta'} de ${milhar(m.kcal)} kcal, você fica perto do seu gasto (≈ ${milhar(def + m.kcal)} kcal): o peso tende a ficar estável.`;
+  else if (!p) texto = `Seguindo a meta de ${milhar(m.kcal)} kcal, o déficit planejado é de ${milhar(def)} kcal/dia. Defina uma meta de peso no perfil para ver a data.`;
+  else if (p.estado === 'atingida') return null;
+  else if (p.estado === 'no_caminho')
+    texto = `Seguindo a meta de ${milhar(m.kcal)} kcal todo dia (déficit de ${milhar(def)} kcal), a meta de peso chega por volta de ${diaCurto(p.data)} (entre ${diaCurto(p.dataCedo)} e ${diaCurto(p.dataTarde)}).`;
+  else return null;
+  return <Text style={{ fontSize: 13, lineHeight: 19, color: cores.verdeTexto, fontWeight: '600' }}>{texto}</Text>;
+}
+
 function TextoProjecao({ dados }: { dados: DadosProgresso }) {
   const p = dados.projecao;
   let texto = 'A projeção aparece com meta definida, pesagens e alguns dias de dieta.';
@@ -326,7 +346,7 @@ const rotuloDia = (dia: string) => {
 };
 
 /** Os 7 dias completos em tabela: o que comeu, o que gastou e o saldo de cada um. */
-function CartaoCalorias({ dados }: { dados: DadosProgresso | null }) {
+function CartaoCalorias({ dados, metaKcal }: { dados: DadosProgresso | null; metaKcal: number | null }) {
   const dias = dados ? [...dados.ultimos7].reverse() : [];
   const comDieta = dias.filter((d) => d.deficit != null);
   const total = comDieta.reduce((s, d) => s + (d.deficit as number), 0);
@@ -359,7 +379,19 @@ function CartaoCalorias({ dados }: { dados: DadosProgresso | null }) {
           return (
             <View key={d.dia} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, borderBottomWidth: 1, borderBottomColor: cores.linhaSuave }}>
                 <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: cores.tinta }} numberOfLines={1}>{rotuloDia(d.dia)}</Text>
-                <Text style={[col, { fontSize: 14, color: d.consumo == null ? cores.cinza : cores.tinta }]}>{d.consumo == null ? '—' : milhar(d.consumo)}</Text>
+                <Text
+                  style={[
+                    col,
+                    {
+                      fontSize: 14,
+                      fontWeight: metaKcal != null && d.consumo != null ? '700' : '400',
+                      color:
+                        d.consumo == null ? cores.cinza : metaKcal == null ? cores.tinta : d.consumo > metaKcal * 1.1 ? cores.laranja : cores.verdeTexto,
+                    },
+                  ]}
+                >
+                  {d.consumo == null ? '—' : milhar(d.consumo)}
+                </Text>
                 <Text style={[col, { fontSize: 14, color: cores.tinta }]}>
                   {d.gasto == null ? '—' : `${milhar(d.gasto)}${d.gastoEstimado ? '*' : ''}`}
                 </Text>
@@ -381,7 +413,8 @@ function CartaoCalorias({ dados }: { dados: DadosProgresso | null }) {
       </View>
 
       <Nota>
-        Verde (−) = déficit · laranja (+) = superávit{algumEstimado ? ' · * = gasto estimado (sem dados do relógio)' : ''}. Toque no ? para ver como cada número é calculado.
+        Saldo: verde (−) = déficit · laranja (+) = superávit.{metaKcal != null ? ` Comeu: verde = dentro da meta de ${milhar(metaKcal)} (até 10% acima), laranja = acima.` : ''}
+        {algumEstimado ? ' * = gasto estimado (sem dados do relógio).' : ''}
       </Nota>
     </Cartao>
   );
