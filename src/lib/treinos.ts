@@ -36,15 +36,34 @@ export function kcalDoTreino(t: TreinoParaGasto, pesoKg: number | null): { kcal:
   return null;
 }
 
-/** Soma, por dia local, as calorias dos treinos que os passos não cobrem. */
+/**
+ * Soma, por dia local, as calorias dos treinos que os passos não cobrem.
+ * Caminhada e corrida ficam de fora: os passos já contam esse gasto, inclusive a corrida
+ * feita no meio da academia. Dois registros do mesmo período (ex.: Hevy estimado e
+ * relógio medindo a mesma musculação) não somam duas vezes: vale o maior.
+ */
 export function kcalTreinosPorDia(treinos: TreinoParaGasto[], pesoKg: number | null): Map<string, number> {
+  const itens = treinos
+    .filter((t) => !ehDeslocamento(t.titulo))
+    .flatMap((t) => {
+      const k = kcalDoTreino(t, pesoKg);
+      if (!k) return [];
+      const ini = Date.parse(t.inicio);
+      return [{ ini, fim: t.fim ? Date.parse(t.fim) : ini, kcal: k.kcal }];
+    })
+    .sort((a, b) => a.ini - b.ini);
+  const grupos: { ini: number; fim: number; kcal: number }[] = [];
+  for (const t of itens) {
+    const g = grupos.at(-1);
+    if (g && t.ini < g.fim) {
+      g.fim = Math.max(g.fim, t.fim);
+      g.kcal = Math.max(g.kcal, t.kcal);
+    } else grupos.push({ ...t });
+  }
   const porDia = new Map<string, number>();
-  for (const t of treinos) {
-    if (ehDeslocamento(t.titulo)) continue;
-    const k = kcalDoTreino(t, pesoKg);
-    if (!k) continue;
-    const dia = diaLocal(new Date(t.inicio));
-    porDia.set(dia, (porDia.get(dia) ?? 0) + k.kcal);
+  for (const g of grupos) {
+    const dia = diaLocal(new Date(g.ini));
+    porDia.set(dia, (porDia.get(dia) ?? 0) + g.kcal);
   }
   return porDia;
 }

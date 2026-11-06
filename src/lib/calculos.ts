@@ -59,15 +59,19 @@ export function gastoDiario(p: {
   if (p.confiarNoTotal && p.kcalTotais != null && p.kcalTotais > 0) {
     return { kcal: Math.round(p.kcalTotais + ajuste), origem: 'relogio' };
   }
+  // Passos + treinos que os passos não pegam (musculação, luta…).
+  const pelosPassos = p.passos != null && p.passos > 0 && p.pesoKg ? p.passos * 0.04 * (p.pesoKg / 70) + (p.kcalTreinos ?? 0) : null;
   if (p.kcalAtivas != null && p.kcalAtivas > 0) {
-    return { kcal: Math.round(basal + p.kcalAtivas + ajuste), origem: 'relogio' };
+    // Alguns relógios (ex.: Zepp) mandam como "ativas" só as calorias dos exercícios gravados,
+    // não as do dia inteiro. Vale o maior dos dois: nunca soma as duas coisas.
+    return { kcal: Math.round(basal + Math.max(p.kcalAtivas, pelosPassos ?? 0) + ajuste), origem: 'relogio' };
   }
   // Alguns relógios só informam o total; ele só vale se for maior que o basal.
   if (p.kcalTotais != null && p.kcalTotais > 0 && (p.confiarNoTotal || p.kcalTotais > basal)) {
     return { kcal: Math.round(p.kcalTotais + ajuste), origem: 'relogio' };
   }
-  if (p.passos != null && p.passos > 0 && p.pesoKg) {
-    return { kcal: Math.round(basal + p.passos * 0.04 * (p.pesoKg / 70) + (p.kcalTreinos ?? 0) + ajuste), origem: 'relogio' };
+  if (pelosPassos != null) {
+    return { kcal: Math.round(basal + pelosPassos + ajuste), origem: 'relogio' };
   }
   const estimativa = basal * p.fatorAtividade;
   const teto = p.tetoTipico != null && p.tetoTipico > 0 ? p.tetoTipico * f : Infinity;

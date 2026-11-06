@@ -211,7 +211,10 @@ describe('gasto: relógio primeiro', () => {
 describe('gasto pelos passos', () => {
   it('sem calorias do relógio, passos viram atividade (0,04 kcal/passo a cada 70 kg)', () => {
     assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105 }).kcal, 2650);
-    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105, kcalAtivas: 300 }).kcal, 2350);
+    // "Ativas" que são só os exercícios gravados (Zepp) não podem apagar os passos e o Hevy: vale o maior
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 10000, pesoKg: 105, kcalAtivas: 300 }).kcal, 2650);
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 5685, pesoKg: 105, kcalAtivas: 319, kcalTreinos: 341 }).kcal, 2732);
+    assert.equal(gastoDiario({ tmb: 2050, fatorAtividade: 1.55, passos: 4000, pesoKg: 105, kcalAtivas: 900 }).kcal, 2950);
   });
 });
 

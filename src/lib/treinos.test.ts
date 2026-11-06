@@ -61,3 +61,17 @@ describe('sessoesDeTreino', () => {
     assert.equal(s[0].minutos, 70);
   });
 });
+
+describe('kcalTreinosPorDia: registros sobrepostos', () => {
+  it('Hevy e relógio na mesma musculação: vale o maior, não a soma', () => {
+    const r = kcalTreinosPorDia(
+      [
+        { titulo: 'Treino Push', inicio: '2026-11-02T22:00:00Z', fim: '2026-11-02T23:00:00Z', kcal: null, app: 'com.hevy' },
+        { titulo: 'Musculação', inicio: '2026-11-02T22:05:00Z', fim: '2026-11-02T23:00:00Z', kcal: 400, app: 'com.huami.watch.hmwatchmanager' },
+        { titulo: 'Corrida', inicio: '2026-11-02T22:30:00Z', fim: '2026-11-02T22:48:00Z', kcal: 194, app: 'com.huami.watch.hmwatchmanager' },
+      ],
+      100,
+    );
+    assert.deepEqual([...r.entries()], [['2026-11-02', 400]]); // Hevy estimado: 2,5 × 100 kg × 1 h = 250
+  });
+});

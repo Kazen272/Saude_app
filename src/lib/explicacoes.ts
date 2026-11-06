@@ -14,7 +14,7 @@ export const EXPLICACOES = {
     titulo: 'Como o saldo é calculado',
     paragrafos: [
       'Comeu: total do dia que o FatSecret envia ao Health Connect, ou o valor que você corrigiu no Revisar dia.',
-      'Gastou, nesta ordem: 1) o total medido pelo relógio, quando ele envia; 2) senão, metabolismo basal (fórmula de Mifflin-St Jeor: peso, altura, idade e sexo) + passos (≈ 0,04 kcal por passo a cada 70 kg) + treinos que os passos não pegam (Hevy estimado pela duração; atividades do app pela intensidade); 3) sem passos nem relógio, basal × nível de atividade do perfil, nunca acima do seu gasto típico medido pelo relógio.',
+      'Gastou, nesta ordem: 1) o total medido pelo relógio, quando ele envia; 2) senão, metabolismo basal (fórmula de Mifflin-St Jeor: peso, altura, idade e sexo) + atividade. A atividade é o maior entre as calorias ativas do relógio e passos (≈ 0,04 kcal por passo a cada 70 kg) + treinos que os passos não pegam (Hevy estimado pela duração; atividades do app pela intensidade). Caminhada e corrida, mesmo no meio da academia, entram pelos passos; dois registros do mesmo treino (Hevy e relógio) contam uma vez, pelo maior. 3) Sem passos nem relógio, basal × nível de atividade do perfil, nunca acima do seu gasto típico medido pelo relógio.',
       '* = gasto estimado, sem dados do relógio naquele dia.',
       'Saldo = gastou − comeu. Verde (−) é déficit; laranja (+) é superávit. Dias sem dieta registrada ficam fora da soma.',
       'Com 14 dias ou mais de peso e dieta, o app compara a perda prevista pelas calorias com a real e corrige o gasto (cartão Previsto × real).',
