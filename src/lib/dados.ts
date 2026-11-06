@@ -36,10 +36,14 @@ import {
 } from './relatorios';
 import { COLUNAS, DOBRAS, MEDIDAS, resumir, type RegistroMedidas, type ResumoMedida, type Valores } from './medidas';
 import { supabase } from './supabase';
-import { kcalDoTreino, kcalTreinosPorDia, type TreinoParaGasto } from './treinos';
+import { kcalDoTreino, kcalTreinosPorDia, sessoesDeTreino, type SessaoDeTreino, type TreinoParaGasto } from './treinos';
+import { diaDaSemana, nomeDaAtividade, treinoCombinaCom, treinoCorrespondente, type TreinoGravado } from './atividades';
 import {
   constanciaDaSemana,
   encontrarPadroes,
+  resumirSemana,
+  type PrevistaDoDia,
+  type SemanaDiaADia,
   gorduraPollock7,
   prontidao,
   sequencias,
@@ -358,6 +362,19 @@ function analisar(p: { perfil: Perfil; pesagens: Pesagem[]; atividades: Atividad
   return { medias, pesoRef, gastoDoDia, balancoDe, deficitMedio, projecao, previstoReal, ajusteKcalDia };
 }
 
+type LinhaTreino = { id?: number; title?: unknown; started_at: unknown; ended_at?: unknown };
+/** Linhas da tabela workouts → sessões de treino (sem deslocamentos curtos, sem duplicatas). */
+function sessoesDasLinhas(linhas: LinhaTreino[] | null): SessaoDeTreino[] {
+  return sessoesDeTreino(
+    (linhas ?? []).map((t) => ({
+      id: t.id,
+      titulo: (t.title as string | null) ?? null,
+      inicio: t.started_at as string,
+      fim: (t.ended_at as string | null) ?? null,
+    })),
+  );
+}
+
 /** Lê atividade e nutrição dos últimos 28 dias, base de toda a análise. */
 async function carregarHistorico28(hoje: string, dias = 28) {
   const desde = somarDias(hoje, -(dias - 1));
@@ -459,15 +476,16 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
 
   const inicio56 = somarDias(hoje, -62);
   const [a56, m56, d56] = inicio56.split('-').map(Number);
-  const [perfil, pesagensTodas, historico, treinos, agua, atividade56, treinos56, registrosMedidas] = await Promise.all([
+  const [perfil, pesagensTodas, historico, treinos, agua, atividade56, treinos56, registrosMedidas, inicioApp] = await Promise.all([
     carregarPerfil(),
     carregarPesagens(Math.max(periodoDias, 28) + 7),
     carregarHistorico28(hoje),
-    supabase.from('workouts').select('active_kcal').gte('started_at', limites7.inicio).lt('started_at', limites7.fim),
+    supabase.from('workouts').select('title, started_at, ended_at, active_kcal').gte('started_at', limites7.inicio).lt('started_at', limites7.fim),
     supabase.from('water_entries').select('amount_ml').gte('logged_at', limites7.inicio).lt('logged_at', limites7.fim),
     supabase.from('daily_activity').select('day, steps, resting_hr').gte('day', inicio56),
-    supabase.from('workouts').select('started_at').gte('started_at', new Date(a56, m56 - 1, d56).toISOString()),
+    supabase.from('workouts').select('title, started_at, ended_at').gte('started_at', new Date(a56, m56 - 1, d56).toISOString()),
     carregarMedidas(),
+    inicioDoAcompanhamento(),
   ]);
   for (const r of [treinos, agua, atividade56, treinos56]) if (r.error) throw r.error;
 
@@ -476,13 +494,19 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
   const media = (xs: number[]) => (xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : null);
   const semanasPassos = porSemana(ativ.filter((a) => a.steps != null).map((a) => ({ dia: a.day, valor: Number(a.steps) })), 8, hoje);
   const semanasFc = porSemana(ativ.filter((a) => a.resting_hr != null).map((a) => ({ dia: a.day, valor: Number(a.resting_hr) })), 8, hoje);
-  const semanasTreinos = porSemana(((treinos56.data ?? []) as { started_at: string }[]).map((t) => ({ dia: diaLocal(new Date(t.started_at)), valor: 1 })), 8, hoje);
-  const tendencias = semanasPassos.map((s, i) => ({
-    semana: s.semana,
-    passos: media(s.valores),
-    fcRepouso: media(semanasFc[i].valores),
-    treinos: semanasTreinos[i].valores.length,
-  }));
+  const semanasTreinos = porSemana(sessoesDasLinhas(treinos56.data).map((t) => ({ dia: t.dia, valor: 1 })), 8, hoje);
+  // Primeiro dia com qualquer dado (passos do relógio inclusive): semanas antes disso ficam de fora.
+  const primeiroPasso = ativ.filter((a) => a.steps != null).map((a) => a.day).sort()[0] ?? null;
+  const inicioTendencias = [inicioApp.qualquer, primeiroPasso].filter((x): x is string => !!x).sort()[0] ?? null;
+  const tendencias = desdeOPrimeiroDado(
+    semanasPassos.map((s, i) => ({
+      semana: s.semana,
+      passos: media(s.valores),
+      fcRepouso: media(semanasFc[i].valores),
+      treinos: semanasTreinos[i].valores.length,
+    })),
+    inicioTendencias,
+  );
 
   // Perimetria: evolução de cada medida e relação cintura ÷ altura
   const medidas = MEDIDAS.map((m) => resumir(registrosMedidas, m)).filter((r): r is ResumoMedida => r != null);
@@ -514,7 +538,7 @@ export async function carregarProgresso(periodoDias: number): Promise<Progresso>
     deficitMedio: analise.deficitMedio,
     ultimos7,
     semana: resumirPeriodo(ultimos7),
-    treinosSemana: { quantidade: listaTreinos.length, kcal: listaTreinos.reduce((s, t) => s + (t.active_kcal ?? 0), 0) },
+    treinosSemana: { quantidade: sessoesDasLinhas(treinos.data).length, kcal: listaTreinos.reduce((s, t) => s + (t.active_kcal ?? 0), 0) },
     aguaMediaMl: Math.round(aguaTotal / 7),
     previstoReal: analise.previstoReal,
     ajusteKcalDia: analise.ajusteKcalDia,
@@ -628,7 +652,7 @@ export async function carregarRelatorioSemanal(): Promise<RelatorioSemanal> {
     carregarNoites(14, semana.fim),
     carregarCheckins(14, semana.fim),
     supabase.from('water_entries').select('amount_ml, logged_at').gte('logged_at', janela.inicio).lt('logged_at', janela.fim),
-    supabase.from('workouts').select('started_at').gte('started_at', janela.inicio).lt('started_at', janela.fim),
+    supabase.from('workouts').select('title, started_at, ended_at').gte('started_at', janela.inicio).lt('started_at', janela.fim),
   ]);
   if (agua.error) throw agua.error;
   if (treinos.error) throw treinos.error;
@@ -649,7 +673,7 @@ export async function carregarRelatorioSemanal(): Promise<RelatorioSemanal> {
     return {
       pesoMedioKg: pesos.length ? Math.round((pesos.reduce((s, p) => s + p, 0) / pesos.length) * 10) / 10 : null,
       deficitTotal: deficits.length ? deficits.reduce((s, x) => s + x, 0) : null,
-      treinos: (treinos.data ?? []).filter((t) => dentro(diaDe(t.started_at as string))).length,
+      treinos: sessoesDasLinhas(treinos.data).filter((t) => dentro(t.dia)).length,
       aguaMediaMl: aguaSemana.length ? Math.round(aguaSemana.reduce((s, r) => s + Number(r.amount_ml), 0) / 7) : null,
       sonoMedioMin: sono.mediaMin,
       variacaoDormirMin: sono.variacaoMin,
@@ -732,6 +756,8 @@ export type Analises = {
   gordura: { dia: string; pct: number; massaGordaKg: number | null; massaMagraKg: number | null }[];
   dieta7: { proteinaGkg: number | null; fibra: number | null; sodioMg: number | null; acucar: number | null; dias: number };
   metaAguaMl: number;
+  /** As últimas 8 semanas (seg–dom), dia a dia; a última é a atual. */
+  semanasDiaADia: SemanaDiaADia[];
   meta: {
     kcal: number;
     sugerida: boolean;
@@ -745,29 +771,76 @@ export type Analises = {
   } | null;
 };
 
-/** Junta 60 dias de tudo num dia consolidado por data. */
+/**
+ * Primeiro dia com dados no app. pesoOuDieta: primeira pesagem ou dieta (base do "desde o começo");
+ * qualquer: inclui o primeiro treino, para não mostrar semanas vazias antes de você começar a usar o app.
+ */
+async function inicioDoAcompanhamento(): Promise<{ pesoOuDieta: string | null; qualquer: string | null }> {
+  const [peso, dieta, treino] = await Promise.all([
+    supabase.from('body_entries').select('measured_on').not('weight_kg', 'is', null).order('measured_on').limit(1).maybeSingle(),
+    supabase.from('nutrition_days').select('day').gt('kcal', 0).order('day').limit(1).maybeSingle(),
+    supabase.from('workouts').select('started_at').order('started_at').limit(1).maybeSingle(),
+  ]);
+  const pd = [peso.data?.measured_on as string | undefined, dieta.data?.day as string | undefined].filter((x): x is string => !!x).sort();
+  const tr = treino.data?.started_at ? diaLocal(new Date(treino.data.started_at as string)) : null;
+  const todos = [...pd, ...(tr ? [tr] : [])].sort();
+  return { pesoOuDieta: pd[0] ?? null, qualquer: todos[0] ?? null };
+}
+
+/** Tira as semanas (seg–dom) que terminaram antes do primeiro dado. */
+function desdeOPrimeiroDado<T extends { semana: string }>(semanas: T[], inicio: string | null): T[] {
+  if (!inicio) return semanas.slice(-1);
+  return semanas.filter((s) => somarDias(s.semana, 6) >= inicio);
+}
+
+/** Junta 63 dias de tudo num dia consolidado por data. */
 async function diasConsolidados(hoje: string, n: number, gastoDe?: (dia: string) => number | null): Promise<DiaConsolidado[]> {
   const desde = somarDias(hoje, -(n - 1));
   const [a, m, d] = desde.split('-').map(Number);
   const inicioIso = new Date(a, m - 1, d).toISOString();
-  const [nutri, agua, treinos, logs, pesos, noites, checkins] = await Promise.all([
+  const [nutri, agua, treinos, logs, pesos, noites, checkins, recorrentes] = await Promise.all([
     supabase.from('nutrition_days').select('day, kcal').gte('day', desde),
     supabase.from('water_entries').select('amount_ml, logged_at').gte('logged_at', inicioIso),
-    supabase.from('workouts').select('started_at').gte('started_at', inicioIso),
-    supabase.from('activity_logs').select('day').eq('status', 'feito').gte('day', desde),
+    supabase.from('workouts').select('id, source, origin_app, title, started_at, ended_at').gte('started_at', inicioIso),
+    supabase.from('activity_logs').select('day, status, recurring_id').gte('day', desde),
     supabase.from('body_entries').select('measured_on').not('weight_kg', 'is', null).gte('measured_on', desde),
     carregarNoites(n, hoje),
     carregarCheckins(n, hoje),
+    supabase.from('recurring_activities').select('id, activity, custom_name, weekdays, start_time, duration_min, enabled, created_at'),
   ]);
-  for (const r of [nutri, agua, treinos, logs, pesos]) if (r.error) throw r.error;
+  for (const r of [nutri, agua, treinos, logs, pesos, recorrentes]) if (r.error) throw r.error;
+  const sessoes = sessoesDasLinhas(treinos.data);
+  const gravados: TreinoGravado[] = (treinos.data ?? []).map((t) => ({
+    id: t.id as number,
+    inicio: t.started_at as string,
+    fim: (t.ended_at as string | null) ?? null,
+    titulo: (t.title as string | null) ?? null,
+    app: (t.origin_app as string | null) ?? null,
+    kcal: null,
+    manual: t.source === 'manual',
+  }));
+  const listaLogs = (logs.data ?? []) as { day: string; status: string; recurring_id: number | null }[];
+  /** Recorrentes previstas para o dia: feito (marcado ou o relógio/Hevy gravou no horário), não feito ou sem registro. */
+  const previstasDe = (dia: string): PrevistaDoDia[] =>
+    ((recorrentes.data ?? []) as Record<string, unknown>[])
+      .filter((r) => (r.weekdays as number[]).includes(diaDaSemana(dia)) && diaLocal(new Date(r.created_at as string)) <= dia)
+      .flatMap((r): PrevistaDoDia[] => {
+        const log = listaLogs.find((l) => l.day === dia && l.recurring_id === r.id);
+        if (!log && !r.enabled) return [];
+        const nome = nomeDaAtividade(r.activity as string, r.custom_name as string | null);
+        if (log) return [{ nome, estado: log.status === 'feito' ? ('feito' as const) : ('nao_feito' as const) }];
+        const mesmoNome = sessoes.some((t) => t.dia === dia && t.titulos.some((x) => x.toLowerCase() === nome.toLowerCase()));
+        const gravado = mesmoNome || treinoCorrespondente(dia, r.start_time as string, r.duration_min as number, gravados, new Set(), treinoCombinaCom(r.activity as string));
+        return [{ nome, estado: gravado ? ('feito' as const) : ('sem_registro' as const) }];
+      });
   const aguaDia = new Map<string, number>();
   for (const w of agua.data ?? []) {
     const k = diaLocal(new Date(w.logged_at as string));
     aguaDia.set(k, (aguaDia.get(k) ?? 0) + Number(w.amount_ml));
   }
   const treinou = new Set([
-    ...(treinos.data ?? []).map((t) => diaLocal(new Date(t.started_at as string))),
-    ...(logs.data ?? []).map((l) => l.day as string),
+    ...sessoesDasLinhas(treinos.data).map((t) => t.dia),
+    ...listaLogs.filter((l) => l.status === 'feito').map((l) => l.day),
   ]);
   const pesou = new Set((pesos.data ?? []).map((p) => p.measured_on as string));
   return Array.from({ length: n }, (_, i) => {
@@ -785,6 +858,8 @@ async function diasConsolidados(hoje: string, n: number, gastoDe?: (dia: string)
       treinou: treinou.has(dia),
       aguaMl: aguaDia.get(dia) ?? 0,
       pesou: pesou.has(dia),
+      sessoes: sessoes.filter((t) => t.dia === dia).map((t) => t.titulos.join(' + ') || 'Treino'),
+      previstas: dia <= hoje ? previstasDe(dia) : [],
     };
   });
 }
@@ -792,13 +867,8 @@ async function diasConsolidados(hoje: string, n: number, gastoDe?: (dia: string)
 export async function carregarAnalises(): Promise<Analises> {
   const hoje = diaLocal();
   // Início do acompanhamento: primeira pesagem ou primeiro dia de dieta (até 1 ano atrás).
-  const [primeiraPesagem, primeiraDieta] = await Promise.all([
-    supabase.from('body_entries').select('measured_on').not('weight_kg', 'is', null).order('measured_on').limit(1).maybeSingle(),
-    supabase.from('nutrition_days').select('day').gt('kcal', 0).order('day').limit(1).maybeSingle(),
-  ]);
-  const candidatos = [primeiraPesagem.data?.measured_on as string | undefined, primeiraDieta.data?.day as string | undefined].filter((x): x is string => !!x);
-  const inicioAcomp = candidatos.length ? candidatos.sort()[0] : null;
-  const diasHistorico = inicioAcomp ? Math.min(365, Math.max(28, Math.round((Date.parse(hoje) - Date.parse(inicioAcomp)) / 86_400_000) + 1)) : 28;
+  const { pesoOuDieta: inicioAcomp, qualquer: inicioDados } = await inicioDoAcompanhamento();
+  const diasHistorico = inicioAcomp ? Math.min(365, Math.max(63, Math.round((Date.parse(hoje) - Date.parse(inicioAcomp)) / 86_400_000) + 1)) : 63;
   const [perfil, pesagens, historico, medidas, dobras] = await Promise.all([
     carregarPerfil(),
     carregarPesagens(Math.max(70, diasHistorico + 7)),
@@ -812,7 +882,7 @@ export async function carregarAnalises(): Promise<Analises> {
   ]);
   if (dobras.error) throw dobras.error;
   const analise = analisar({ perfil, pesagens, ...historico, hoje });
-  const dias = await diasConsolidados(hoje, 60, (d) => (d < hoje ? analise.balancoDe(d).gasto : null));
+  const dias = await diasConsolidados(hoje, 63, (d) => (d < hoje ? analise.balancoDe(d).gasto : null));
   const ateOntem = dias.filter((d) => d.dia < hoje);
   const metaAguaMl = perfil.water_goal_ml;
 
@@ -822,7 +892,7 @@ export async function carregarAnalises(): Promise<Analises> {
     const ini = somarDias(segunda, -7 * (7 - i));
     const semana = dias.filter((d) => d.dia >= ini && d.dia <= somarDias(ini, 6));
     return { semana: ini, nota: constanciaDaSemana(semana, metaAguaMl).nota };
-  });
+  }).filter((s) => !inicioDados || somarDias(s.semana, 6) >= inicioDados);
 
   // Platô e recomposição
   const mediaEm = (dia: string) => [...analise.medias].reverse().find((p) => p.dia <= dia)?.pesoKg ?? null;
@@ -903,8 +973,33 @@ export async function carregarAnalises(): Promise<Analises> {
     };
   }
 
+  // Semana dia a dia: 8 semanas seg–dom, a atual inclusive (dias futuros ficam vazios)
+  const semanasDiaADia = Array.from({ length: 8 }, (_, i) => {
+    const ini = somarDias(segunda, -7 * (7 - i));
+    const linhas = Array.from({ length: 7 }, (_, j) => {
+      const dia = somarDias(ini, j);
+      const c = dias.find((x) => x.dia === dia);
+      const b = dia <= hoje ? analise.balancoDe(dia) : null;
+      return {
+        dia,
+        futuro: dia > hoje,
+        hoje: dia === hoje,
+        consumo: c?.consumo ?? null,
+        deficit: dia < hoje ? (b?.deficit ?? null) : null,
+        gastoEstimado: b?.gastoEstimado ?? false,
+        treinos: c?.sessoes ?? [],
+        previstas: c?.previstas ?? [],
+        sonoMin: c?.sonoMin ?? null,
+        aguaMl: c?.aguaMl ?? 0,
+        pesoKg: pesagens.filter((p) => p.dia === dia).at(-1)?.pesoKg ?? null,
+      };
+    });
+    return resumirSemana(ini, linhas, metaKcal);
+  }).filter((s) => !inicioDados || somarDias(s.segunda, 6) >= inicioDados);
+
   return {
     meta,
+    semanasDiaADia,
     padroes: encontrarPadroes(dias),
     constancia: constanciaDaSemana(ateOntem.slice(-7), metaAguaMl),
     constanciaSemanas,
@@ -939,7 +1034,7 @@ export async function carregarProntidao(): Promise<Prontidao | null> {
     supabase.from('daily_activity').select('day, resting_hr').gte('day', desde14).not('resting_hr', 'is', null),
     carregarNoites(3, hoje),
     carregarCheckins(1, hoje),
-    supabase.from('workouts').select('id, source, started_at, ended_at').gte('started_at', new Date(a, m - 1, d).toISOString()),
+    supabase.from('workouts').select('id, title, started_at, ended_at').gte('started_at', new Date(a, m - 1, d).toISOString()),
     supabase.from('activity_logs').select('workout_id, intensity').eq('status', 'feito').gte('day', desde35),
     carregarPerfil(),
     carregarPesagens(35),
@@ -950,11 +1045,10 @@ export async function carregarProntidao(): Promise<Prontidao | null> {
   // Carga de cada treino = minutos × intensidade (0–10): leve 3, moderada 5, intensa 7; sem informação, 5.
   const INTENSIDADE: Record<string, number> = { leve: 3, moderada: 5, intensa: 7 };
   const intensidadeDe = new Map((logs.data ?? []).filter((l) => l.workout_id != null).map((l) => [l.workout_id as number, INTENSIDADE[l.intensity as string] ?? 5]));
-  const cargas = (treinos.data ?? []).flatMap((t) => {
-    if (!t.ended_at) return [];
-    const min = (Date.parse(t.ended_at as string) - Date.parse(t.started_at as string)) / 60_000;
-    if (min < 2) return [];
-    return [{ dia: diaLocal(new Date(t.started_at as string)), carga: Math.round(min * (intensidadeDe.get(t.id as number) ?? 5)) }];
+  const cargas = sessoesDasLinhas(treinos.data).flatMap((t) => {
+    if (t.minutos < 2) return [];
+    const intensidade = t.ids.length ? Math.max(...t.ids.map((id) => intensidadeDe.get(id) ?? 5)) : 5;
+    return [{ dia: t.dia, carga: Math.round(t.minutos * intensidade) }];
   });
 
   const analise = analisar({ perfil, pesagens, ...historico, hoje });

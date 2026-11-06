@@ -21,7 +21,13 @@ export type DiaConsolidado = {
   treinou: boolean;
   aguaMl: number;
   pesou: boolean;
+  /** Uma entrada por sessão de treino ("Treino Push", "Muay Thai"). */
+  sessoes?: string[];
+  /** Atividades recorrentes previstas para o dia e o que aconteceu com elas. */
+  previstas?: PrevistaDoDia[];
 };
+
+export type PrevistaDoDia = { nome: string; estado: 'feito' | 'nao_feito' | 'sem_registro' };
 
 // ---------------------------------------------------------------------------
 // 1. Padrões
@@ -440,5 +446,64 @@ export function desdeOInicio(p: {
     kgNaBalanca: p.mediaInicio != null && p.mediaHoje != null ? Math.round((p.mediaHoje - p.mediaInicio) * 10) / 10 : null,
     cintura: c.length >= 2 ? { de: c[0].cm, para: c[c.length - 1].cm } : null,
     semanas,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Semana dia a dia (Progresso › Resumo)
+
+export type DiaDaSemana = {
+  dia: string;
+  /** Dia que ainda não chegou. */
+  futuro: boolean;
+  hoje: boolean;
+  consumo: number | null;
+  /** Gasto − comido; só em dias completos com dieta. */
+  deficit: number | null;
+  gastoEstimado: boolean;
+  /** dentro: até 10% acima da meta; acima: passou disso. */
+  meta: 'dentro' | 'acima' | null;
+  treinos: string[];
+  previstas: PrevistaDoDia[];
+  sonoMin: number | null;
+  aguaMl: number;
+  pesoKg: number | null;
+};
+
+export type SemanaDiaADia = {
+  segunda: string;
+  dias: DiaDaSemana[];
+  treinos: number;
+  diasComTreino: number;
+  diasComDieta: number;
+  diasNaMeta: number;
+  /** Atividades previstas que passaram sem ser feitas (marcadas "não fiz" ou sem registro). */
+  faltas: number;
+  deficitTotal: number | null;
+  sonoMedioMin: number | null;
+};
+
+export function resumirSemana(
+  segunda: string,
+  dias: Omit<DiaDaSemana, 'meta'>[],
+  metaKcal: number | null,
+): SemanaDiaADia {
+  const comMeta: DiaDaSemana[] = dias.map((d) => ({
+    ...d,
+    meta: d.consumo == null || metaKcal == null || d.futuro ? null : d.consumo <= metaKcal * (1 + TOLERANCIA_META) ? 'dentro' : 'acima',
+  }));
+  const passados = comMeta.filter((d) => !d.futuro);
+  const deficits = passados.map((d) => d.deficit).filter((x): x is number => x != null);
+  const sonos = passados.map((d) => d.sonoMin).filter((x): x is number => x != null);
+  return {
+    segunda,
+    dias: comMeta,
+    treinos: passados.reduce((s, d) => s + d.treinos.length, 0),
+    diasComTreino: passados.filter((d) => d.treinos.length > 0).length,
+    diasComDieta: passados.filter((d) => d.consumo != null).length,
+    diasNaMeta: passados.filter((d) => d.meta === 'dentro').length,
+    faltas: passados.reduce((s, d) => s + d.previstas.filter((p) => p.estado !== 'feito' && !(d.hoje && p.estado === 'sem_registro')).length, 0),
+    deficitTotal: deficits.length ? deficits.reduce((s, x) => s + x, 0) : null,
+    sonoMedioMin: sonos.length ? Math.round(sonos.reduce((s, x) => s + x, 0) / sonos.length) : null,
   };
 }

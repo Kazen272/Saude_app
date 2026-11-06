@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GradeCheckins, GraficoSono } from '@/components/bemestar';
 import { GraficoPeso, GraficoSemanas } from '@/components/graficos';
 import { CartaoMedidas } from '@/components/medidas';
-import { CartaoConstancia, CartaoDesdeInicio, CartaoGordura, CartaoPadroes, CartaoQualidadeDieta, CartaoSemanaMeta, CartoesSinais } from '@/components/analises';
+import { CartaoConstancia, CartaoDesdeInicio, CartaoSemanaDiaADia, CartaoGordura, CartaoPadroes, CartaoQualidadeDieta, CartaoSemanaMeta, CartoesSinais } from '@/components/analises';
 import { CabecalhoCartao, Cabecalho, Cartao, Nota, Rotulo, estilos } from '@/components/ui';
 import { LIMITE_RITMO_PCT } from '@/lib/calculos';
 import { formatarDuracao, mediaCampo, resumirSono, type CheckIn, type Noite } from '@/lib/bemestar';
@@ -64,6 +64,12 @@ export default function Progresso() {
   const primeira = dados?.medias[0];
   const ultima = dados?.medias.at(-1);
   const variacao = primeira && ultima && primeira.dia !== ultima.dia ? ultima.pesoKg - primeira.pesoKg : null;
+  const diasDeVariacao = primeira && ultima ? Math.round((Date.parse(ultima.dia) - Date.parse(primeira.dia)) / 86_400_000) : 0;
+  // Período real dos dados: "em 12 dias", "em 3 semanas" (não "8 semanas" quando ainda não há 8 semanas de pesagens).
+  const textoPeriodo = diasDeVariacao < 14 ? `em ${diasDeVariacao} dia${diasDeVariacao === 1 ? '' : 's'}` : `em ${Math.round(diasDeVariacao / 7)} semanas`;
+  const nSemanas = dados?.tendencias.length ?? 0;
+  const sufixoSemanas = nSemanas > 1 ? ` · ${nSemanas} semanas` : '';
+  const completas = Math.max(0, nSemanas - 1);
   const sono = resumirSono(noites);
 
   return (
@@ -126,11 +132,12 @@ export default function Progresso() {
             <Cartao estilo={{ gap: 6 }}>
               <CabecalhoCartao titulo="Meta de peso" info={EXPLICACOES.peso} />
               <Text style={{ fontSize: 22, fontWeight: '800', color: cores.tinta }}>
-                {variacao == null ? '—' : `${variacao <= 0 ? '−' : '+'}${decimal(Math.abs(variacao))} kg em 8 semanas`}
+                {variacao == null ? '—' : `${variacao <= 0 ? '−' : '+'}${decimal(Math.abs(variacao))} kg ${textoPeriodo}`}
               </Text>
               {dados && <TextoProjecao dados={dados} />}
               <TextoProjecaoMeta a={analises} />
             </Cartao>
+            <CartaoSemanaDiaADia a={analises} />
             <CartoesSinais a={analises} />
             <CartaoDesdeInicio a={analises} />
             <CartaoConstancia a={analises} />
@@ -230,7 +237,11 @@ export default function Progresso() {
                 vazio="Os treinos do Hevy, do relógio e as atividades feitas aparecem aqui."
               />
               {dados && dados.tendencias.some((t) => t.treinos > 0) && (
-                <Nota>{dados.tendencias.slice(0, -1).filter((t) => t.treinos >= 3).length} das últimas 7 semanas completas com 3 treinos ou mais.</Nota>
+                <Nota>
+                  {completas === 0
+                    ? 'Primeira semana com dados; a comparação aparece quando ela terminar.'
+                    : `${dados.tendencias.slice(0, -1).filter((t) => t.treinos >= 3).length} de ${completas} semana${completas === 1 ? '' : 's'} completa${completas === 1 ? '' : 's'} com 3 treinos ou mais.`}
+                </Nota>
               )}
             </Cartao>
 
@@ -257,7 +268,7 @@ export default function Progresso() {
             </Cartao>
 
             <Cartao estilo={{ gap: 8 }}>
-              <CabecalhoCartao titulo="Passos por dia · 8 semanas" info={EXPLICACOES.passos} />
+              <CabecalhoCartao titulo={`Passos por dia${sufixoSemanas}`} info={EXPLICACOES.passos} />
               <GraficoSemanas
                 semanas={(dados?.tendencias ?? []).map((t) => ({ semana: t.semana, valor: t.passos }))}
                 formatar={(v) => (v >= 1000 ? `${decimal(v / 1000)} mil` : String(v))}
@@ -268,7 +279,7 @@ export default function Progresso() {
             </Cartao>
 
             <Cartao estilo={{ gap: 8 }}>
-              <CabecalhoCartao titulo="FC de repouso · 8 semanas" info={EXPLICACOES.fc} />
+              <CabecalhoCartao titulo={`FC de repouso${sufixoSemanas}`} info={EXPLICACOES.fc} />
               <GraficoSemanas
                 semanas={(dados?.tendencias ?? []).map((t) => ({ semana: t.semana, valor: t.fcRepouso }))}
                 formatar={(v) => `${v}`}

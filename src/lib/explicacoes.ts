@@ -65,7 +65,7 @@ export const EXPLICACOES = {
     titulo: 'Nota de constância',
     paragrafos: [
       'Mede regularidade, não resultado. Vale para os 7 dias completos até ontem.',
-      'Pontos: dieta registrada todo dia (25) · meta de água (15) · 3 dias com treino (20) · noites de 7h ou mais (20) · 3 pesagens (20). Cada item dá pontos proporcionais ao que foi cumprido.',
+      'Pontos: dieta registrada todo dia (25) · meta de água (15) · 3 dias com treino (20; caminhada curta do relógio não conta) · noites de 7h ou mais (20) · 3 pesagens (20). Cada item dá pontos proporcionais ao que foi cumprido.',
       'Sequências: dias seguidos, até ontem, com dieta registrada, na meta de água e em déficit.',
       'O gráfico mostra a nota de cada semana (segunda a domingo); a última ainda está em andamento.',
     ],
@@ -92,7 +92,7 @@ export const EXPLICACOES = {
   treinos: {
     titulo: 'Treinos por semana',
     paragrafos: [
-      'Conta treinos importados (Hevy, relógio, Strava…) e atividades marcadas como feitas no app, por semana de segunda a domingo.',
+      'Conta treinos importados (Hevy, relógio, Strava…) e atividades marcadas como feitas no app, por semana de segunda a domingo. Registros que se sobrepõem contam uma vez só, e caminhadas ou corridas de menos de 30 minutos que o relógio detecta sozinho não contam.',
       'A linha marca a meta de 3 treinos por semana.',
     ],
   },
@@ -118,6 +118,16 @@ export const EXPLICACOES = {
       'FC de repouso: −8 por bpm acima de 2 da sua média de 14 dias, quando o relógio envia.',
       'Boa: 75 ou mais · Média: 50 a 74 · Baixa: abaixo de 50. Sem o check-in de hoje (energia e dor), a avaliação fica "parcial" e nunca passa de média.',
       'É uma orientação geral, não substitui avaliação profissional; dor forte ou persistente pede um médico ou fisioterapeuta.',
+    ],
+  },
+  semanaDiaADia: {
+    titulo: 'Semana dia a dia',
+    paragrafos: [
+      'Cada linha é um dia, de segunda a domingo. Use as setas para ver até 8 semanas atrás.',
+      '● Treino feito. Registros que se sobrepõem (ex.: Hevy e relógio gravando a mesma academia) contam como um treino só. Caminhadas e corridas de menos de 30 minutos que o relógio detecta sozinho (ida à academia, aquecimento) não contam como treino; elas já entram no gasto pelos passos.',
+      '○ Atividade prevista em Mais › Atividades que não aconteceu: "não fez" quando você marcou assim, "não marcado" quando o dia passou sem marcar e sem treino gravado no horário.',
+      'À direita: o que você comeu, verde até 10% acima da meta e laranja acima disso. Embaixo, o saldo do dia (− é déficit); * = gasto estimado, sem dados do relógio.',
+      'O resumo do topo soma só os dias que já passaram. A meta é a atual, também para semanas anteriores.',
     ],
   },
   metaDoDia: {

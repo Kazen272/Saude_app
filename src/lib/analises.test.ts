@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { desdeOInicio, metaNoPeriodo, semanaAtual, constanciaDaSemana, encontrarPadroes, gorduraPollock7, prontidao, sequencias, sinaisDoCorpo, type DiaConsolidado } from './analises.ts';
+import { desdeOInicio, metaNoPeriodo, resumirSemana, semanaAtual, constanciaDaSemana, encontrarPadroes, gorduraPollock7, prontidao, sequencias, sinaisDoCorpo, type DiaConsolidado } from './analises.ts';
 
 const dia = (d: string, p: Partial<DiaConsolidado> = {}): DiaConsolidado => ({
   dia: d,
@@ -135,5 +135,30 @@ describe('meta × real', () => {
     assert.equal(r.kgNaBalanca, -0.4);
     assert.equal(r.cintura, null);
     assert.deepEqual(r.semanas, [{ semana: '2026-10-26', deficit: 1500 }]);
+  });
+});
+
+describe('semana dia a dia', () => {
+  const base = { futuro: false, hoje: false, gastoEstimado: false, sonoMin: 420, aguaMl: 2000, pesoKg: null, previstas: [] };
+  it('soma treinos, meta e faltas só dos dias que passaram', () => {
+    const s = resumirSemana(
+      '2026-11-02',
+      [
+        { ...base, dia: '2026-11-02', consumo: 2100, deficit: 500, treinos: ['Treino Push'] },
+        { ...base, dia: '2026-11-03', consumo: 2400, deficit: 100, treinos: ['Muay Thai'] },
+        { ...base, dia: '2026-11-04', consumo: null, deficit: null, treinos: [], previstas: [{ nome: 'Muay Thai', estado: 'nao_feito' }] },
+        { ...base, dia: '2026-11-05', consumo: 1900, deficit: 700, treinos: [], previstas: [{ nome: 'Muay Thai', estado: 'sem_registro' }], hoje: true },
+        { ...base, dia: '2026-11-06', futuro: true, consumo: null, deficit: null, treinos: [] },
+        { ...base, dia: '2026-11-07', futuro: true, consumo: null, deficit: null, treinos: [] },
+        { ...base, dia: '2026-11-08', futuro: true, consumo: null, deficit: null, treinos: [] },
+      ],
+      2000,
+    );
+    assert.equal(s.treinos, 2);
+    assert.equal(s.diasNaMeta, 2); // 2.100 (≤ 2.200) e 1.900; 2.400 passou
+    assert.equal(s.diasComDieta, 3);
+    assert.equal(s.faltas, 1); // hoje ainda não conta como falta
+    assert.equal(s.deficitTotal, 1300);
+    assert.equal(s.dias[1].meta, 'acima');
   });
 });

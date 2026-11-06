@@ -3,7 +3,8 @@ import { Pressable, Text, View } from 'react-native';
 
 import { GraficoSemanas } from '@/components/graficos';
 import { CabecalhoCartao, Cartao, Nota } from '@/components/ui';
-import type { Prontidao } from '@/lib/analises';
+import type { DiaDaSemana, Prontidao } from '@/lib/analises';
+import { formatarDuracao } from '@/lib/bemestar';
 import type { Analises } from '@/lib/dados';
 import { decimal, diaCurto, milhar } from '@/lib/datas';
 import { EXPLICACOES } from '@/lib/explicacoes';
@@ -379,5 +380,124 @@ export function CartaoDesdeInicio({ a }: { a: Analises | null }) {
         vazio="O déficit de cada semana aparece aqui."
       />
     </Cartao>
+  );
+}
+
+const DIAS_CURTOS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+/** Semana de segunda a domingo, dia a dia: treinos, atividades previstas, comida × meta, sono, água e peso. */
+export function CartaoSemanaDiaADia({ a }: { a: Analises | null }) {
+  const semanas = a?.semanasDiaADia ?? [];
+  const [indice, setIndice] = useState<number | null>(null);
+  if (!semanas.length) return null;
+  const i = indice ?? semanas.length - 1;
+  const s = semanas[i];
+  const fim = s.dias[6].dia;
+  const atual = i === semanas.length - 1;
+  const passados = s.dias.filter((d) => !d.futuro).length;
+  const seta = (dir: -1 | 1, ativa: boolean) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={dir < 0 ? 'Semana anterior' : 'Próxima semana'}
+      disabled={!ativa}
+      onPress={() => setIndice(i + dir)}
+      hitSlop={8}
+      style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.segmento, opacity: ativa ? 1 : 0.35 }}
+    >
+      <Text style={{ fontSize: 18, fontWeight: '800', color: cores.tinta, marginTop: -2 }}>{dir < 0 ? '‹' : '›'}</Text>
+    </Pressable>
+  );
+  const resumo = [
+    `${s.treinos} treino${s.treinos === 1 ? '' : 's'}${s.treinos ? ` em ${s.diasComTreino} dia${s.diasComTreino === 1 ? '' : 's'}` : ''}`,
+    s.diasComDieta ? `meta em ${s.diasNaMeta} de ${s.diasComDieta} dias` : null,
+    s.deficitTotal != null ? `${s.deficitTotal >= 0 ? 'déficit' : 'superávit'} de ${milhar(Math.abs(s.deficitTotal))} kcal` : null,
+    s.sonoMedioMin != null ? `sono médio ${formatarDuracao(s.sonoMedioMin)}` : null,
+  ].filter(Boolean);
+  return (
+    <Cartao estilo={{ gap: 10 }}>
+      <CabecalhoCartao titulo="Semana dia a dia" info={EXPLICACOES.semanaDiaADia} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {seta(-1, i > 0)}
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: cores.tinta }}>{atual ? 'Esta semana' : i === semanas.length - 2 ? 'Semana passada' : `${diaCurto(s.segunda)} – ${diaCurto(fim)}`}</Text>
+          <Text style={{ fontSize: 12, color: cores.cinza }}>
+            {diaCurto(s.segunda)} – {diaCurto(fim)}
+            {atual && passados < 7 ? ` · ${passados} de 7 dias` : ''}
+          </Text>
+        </View>
+        {seta(1, !atual)}
+      </View>
+      <Text style={{ fontSize: 13, lineHeight: 19, color: cores.tintaSuave }}>
+        {resumo.join(' · ')}
+        {s.faltas ? <Text style={{ color: cores.laranja, fontWeight: '700' }}>{` · ${s.faltas} atividade${s.faltas === 1 ? '' : 's'} prevista${s.faltas === 1 ? '' : 's'} não feita${s.faltas === 1 ? '' : 's'}`}</Text> : null}
+      </Text>
+      <View>
+        {s.dias.map((d, j) => (
+          <LinhaDoDia key={d.dia} d={d} nome={DIAS_CURTOS[j]} primeira={j === 0} />
+        ))}
+      </View>
+    </Cartao>
+  );
+}
+
+function LinhaDoDia({ d, nome, primeira }: { d: DiaDaSemana; nome: string; primeira: boolean }) {
+  const numero = Number(d.dia.slice(8));
+  const extras = [
+    d.sonoMin != null ? `sono ${formatarDuracao(d.sonoMin)}` : null,
+    d.aguaMl > 0 ? `água ${decimal(d.aguaMl / 1000)} L` : null,
+    d.pesoKg != null ? `${decimal(d.pesoKg)} kg` : null,
+  ].filter(Boolean);
+  const naoFeitas = d.previstas.filter((p) => p.estado !== 'feito' && !(d.hoje && p.estado === 'sem_registro'));
+  const pendentesHoje = d.hoje ? d.previstas.filter((p) => p.estado === 'sem_registro') : [];
+  const corKcal = d.meta === 'acima' ? cores.laranja : d.meta === 'dentro' ? cores.verdeTexto : cores.tinta;
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: 10,
+        paddingVertical: 9,
+        borderTopWidth: primeira ? 0 : 1,
+        borderTopColor: cores.linhaSuave,
+        opacity: d.futuro ? 0.45 : 1,
+      }}
+    >
+      <View style={{ width: 38, alignItems: 'center', paddingTop: 1 }}>
+        <Text style={{ fontSize: 12, fontWeight: '700', color: d.hoje ? cores.verdeTexto : cores.cinza }}>{nome}</Text>
+        <Text style={{ fontSize: 17, fontWeight: '800', color: d.hoje ? cores.verdeTexto : cores.tinta, fontVariant: ['tabular-nums'] }}>{numero}</Text>
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 2, justifyContent: 'center' }}>
+        {d.treinos.map((t, k) => (
+          <Text key={k} numberOfLines={2} style={{ fontSize: 14, fontWeight: '700', color: cores.tinta }}>
+            {`● ${t}`}
+          </Text>
+        ))}
+        {naoFeitas.map((p) => (
+          <Text key={p.nome} numberOfLines={2} style={{ fontSize: 13, fontWeight: '700', color: cores.laranja }}>
+            {`○ ${p.nome} · ${p.estado === 'nao_feito' ? 'não fez' : 'não marcado'}`}
+          </Text>
+        ))}
+        {pendentesHoje.map((p) => (
+          <Text key={p.nome} numberOfLines={2} style={{ fontSize: 13, color: cores.cinza }}>
+            {`○ ${p.nome} · previsto`}
+          </Text>
+        ))}
+        {!d.futuro && d.treinos.length === 0 && naoFeitas.length === 0 && pendentesHoje.length === 0 && (
+          <Text style={{ fontSize: 13, color: cores.cinza }}>sem treino</Text>
+        )}
+        {extras.length > 0 && <Text style={{ fontSize: 12, color: cores.cinza }}>{extras.join(' · ')}</Text>}
+      </View>
+      <View style={{ alignItems: 'flex-end', justifyContent: 'center', minWidth: 72 }}>
+        {d.consumo != null ? (
+          <>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: corKcal, fontVariant: ['tabular-nums'] }}>{milhar(d.consumo)}</Text>
+            <Text style={{ fontSize: 11, color: cores.cinza, fontVariant: ['tabular-nums'] }}>
+              {d.hoje ? 'kcal até agora' : d.deficit != null ? `${d.deficit >= 0 ? '−' : '+'}${milhar(Math.abs(d.deficit))}${d.gastoEstimado ? '*' : ''}` : 'kcal'}
+            </Text>
+          </>
+        ) : (
+          <Text style={{ fontSize: 12, color: cores.cinza }}>{d.futuro ? '' : 'sem dieta'}</Text>
+        )}
+      </View>
+    </View>
   );
 }
